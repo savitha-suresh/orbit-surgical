@@ -13,7 +13,7 @@ from scipy.spatial.transform.rotation import Rotation
 import carb
 import omni
 
-from omni.isaac.lab.devices import DeviceBase
+from isaaclab.devices import DeviceBase
 
 
 class Se3KeyboardDualArm(DeviceBase):

@@ -12,8 +12,8 @@ category = "robotics"
 keywords = ["robotics", "rl", "il", "learning"]
 
 [dependencies]
-"omni.isaac.lab" = {}
-"omni.isaac.lab_assets" = {}
+"isaaclab" = {}
+"isaaclab_assets" = {}
 "omni.isaac.core" = {}
 "omni.isaac.gym" = {}
 "omni.replicator.isaac" = {}

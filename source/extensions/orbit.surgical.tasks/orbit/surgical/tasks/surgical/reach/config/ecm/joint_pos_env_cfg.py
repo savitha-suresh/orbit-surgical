@@ -9,11 +9,11 @@ import math
 
 from orbit.surgical.assets import ORBITSURGICAL_ASSETS_DATA_DIR
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.assets import AssetBaseCfg
-from omni.isaac.lab.managers import EventTermCfg as EventTerm
-from omni.isaac.lab.sensors import CameraCfg, FrameTransformerCfg
-from omni.isaac.lab.utils import configclass
+import isaaclab.sim as sim_utils
+from isaaclab.assets import AssetBaseCfg
+from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.sensors import CameraCfg, FrameTransformerCfg
+from isaaclab.utils import configclass
 
 import orbit.surgical.tasks.surgical.reach.mdp as mdp
 from orbit.surgical.tasks.surgical.reach.reach_env_cfg import ReachEnvCfg
@@ -21,7 +21,7 @@ from orbit.surgical.tasks.surgical.reach.reach_env_cfg import ReachEnvCfg
 ##
 # Pre-defined configs
 ##
-from omni.isaac.lab.markers.config import FRAME_MARKER_CFG  # isort: skip
+from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 from orbit.surgical.assets.ecm import ECM_CFG  # isort: skip
 
 

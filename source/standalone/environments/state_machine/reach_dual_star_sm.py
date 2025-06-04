@@ -11,7 +11,7 @@ It uses the `warp` library to run the state machine in parallel on the GPU.
 
 .. code-block:: bash
 
-    ${IsaacLab_PATH}/isaaclab.sh -p source/standalone/environments/state_machine/reach_dual_star_sm.py --num_envs 1
+    ${IsaacLab_PATH}/isaaclab.sh -p scripts/environments/state_machine/reach_dual_star_sm.py --num_envs 1
 
 """
 
@@ -19,7 +19,7 @@ It uses the `warp` library to run the state machine in parallel on the GPU.
 
 import argparse
 
-from omni.isaac.lab.app import AppLauncher
+from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Reach state machine for star platform environments.")
@@ -44,11 +44,11 @@ from collections.abc import Sequence
 
 import warp as wp
 
-from omni.isaac.lab.assets import RigidObject
+from isaaclab.assets import RigidObject
 
-from omni.isaac.lab_tasks.utils.parse_cfg import parse_env_cfg
+from isaaclab_tasks.utils.parse_cfg import parse_env_cfg
 
-from omni.isaac.lab.utils.math import subtract_frame_transforms
+from isaaclab.utils.math import subtract_frame_transforms
 
 import orbit.surgical.tasks  # noqa: F401
 from orbit.surgical.tasks.surgical.reach_dual.reach_env_cfg import ReachEnvCfg
