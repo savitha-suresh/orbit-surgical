@@ -1,8 +1,3 @@
-# Copyright (c) 2024, The ORBIT-Surgical Project Developers.
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
 from orbit.surgical.assets import ORBITSURGICAL_ASSETS_DATA_DIR
 
 from isaaclab.assets import RigidObjectCfg
@@ -11,9 +6,10 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from isaaclab.utils import configclass
+from isaaclab.envs import mdp
 
-from orbit.surgical.tasks.surgical.handover import mdp
-from orbit.surgical.tasks.surgical.handover.handover_env_cfg import HandoverEnvCfg
+
+from .handover_env_cfg import DualArmHandoverEnvCfg
 
 ##
 # Pre-defined configs
@@ -23,18 +19,18 @@ from orbit.surgical.assets.psm import PSM_CFG  # isort: skip
 
 
 @configclass
-class BlockHandoverEnvCfg(HandoverEnvCfg):
+class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
         # Set PSM as robot
         self.scene.robot_1 = PSM_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot_1")
         self.scene.robot_1.init_state.pos = (0.2, 0.0, 0.15)
+        #self.scene.robot_1.init_state.pos = (-0.0076, -0.0055,  0.1)
         self.scene.robot_1.init_state.rot = (1.0, 0.0, 0.0, 0.0)
         self.scene.robot_2 = PSM_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot_2")
         self.scene.robot_2.init_state.pos = (-0.2, 0.0, 0.15)
         self.scene.robot_2.init_state.rot = (1.0, 0.0, 0.0, 0.0)
-
         # Set actions for the specific robot type (PSM)
         self.actions.body_1_joint_pos = mdp.JointPositionActionCfg(
             asset_name="robot_1",
@@ -122,6 +118,8 @@ class BlockHandoverEnvCfg(HandoverEnvCfg):
                 ),
             ],
         )
+        
+    
 
 
 @configclass
@@ -133,4 +131,4 @@ class BlockHandoverEnvCfg_PLAY(BlockHandoverEnvCfg):
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         # disable randomization for play
-        self.observations.policy.enable_corruption = False
+        #self.observations.policy.enable_corruption = False

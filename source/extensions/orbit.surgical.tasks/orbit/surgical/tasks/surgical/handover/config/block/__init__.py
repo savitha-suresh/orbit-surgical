@@ -22,6 +22,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": joint_pos_env_cfg.BlockHandoverEnvCfg,
         "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.HandoverBlockPPORunnerCfg,
+        "skrl_mappo_cfg_entry_point": f"{agents.__name__}:skrl_mappo_cfg.yaml",
     },
     disable_env_checker=True,
 )
@@ -70,6 +71,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": ik_rel_env_cfg.BlockHandoverEnvCfg,
         "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.HandoverBlockPPORunnerCfg,
+        "skrl_mappo_cfg_entry_point": f"{agents.__name__}:skrl_mappo_cfg.yaml",
     },
     disable_env_checker=True,
 )
