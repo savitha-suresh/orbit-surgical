@@ -174,7 +174,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     reset_rot_noise = 0.1
     fall_z_threshold = -0.05
     dist_reward_scale = 20.0
-    act_moving_average = 1.0
+    act_moving_average = 1
     episode_length_s = 15
 
     actions: ActionsCfg = ActionsCfg()

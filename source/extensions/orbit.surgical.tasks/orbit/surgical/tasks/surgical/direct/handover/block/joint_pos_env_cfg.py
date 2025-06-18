@@ -25,11 +25,11 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
         super().__post_init__()
         # Set PSM as robot
         self.scene.robot_1 = PSM_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot_1")
-        self.scene.robot_1.init_state.pos = (0.2, 0.0, 0.15)
+        self.scene.robot_1.init_state.pos = (0.18, 0.0, 0.15)
         #self.scene.robot_1.init_state.pos = (-0.0076, -0.0055,  0.1)
         self.scene.robot_1.init_state.rot = (1.0, 0.0, 0.0, 0.0)
         self.scene.robot_2 = PSM_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot_2")
-        self.scene.robot_2.init_state.pos = (-0.2, 0.0, 0.15)
+        self.scene.robot_2.init_state.pos = (-0.18, 0.0, 0.15)
         self.scene.robot_2.init_state.rot = (1.0, 0.0, 0.0, 0.0)
         # Set actions for the specific robot type (PSM)
         self.actions.body_1_joint_pos = mdp.JointPositionActionCfg(
