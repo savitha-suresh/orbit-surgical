@@ -17,7 +17,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
     def __init__(self, cfg: BlockHandoverEnvCfg, render_mode=None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
-        self.phase_detector = PhaseDetector(cfg)
+        self.phase_detector = PhaseDetector(cfg, self)
         self.ee_link_name = self.cfg.ee_link_name
         self.goal_rot = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
         self.goal_rot[:, 0] = 1.0
@@ -230,9 +230,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         pos_all = self.object.data.root_pos_w
         return  pos_all
     
-    def get_reach_p1(self):
+    def get_p1_pos(self):
         obj_pos = self._get_obj_pos()
         obj_pos[: , 2] += 0.1
+        return obj_pos
     
     def _get_r2_stationary_rew(self, env_id):
         ee_position_2 = self._get_ee_position(self.robot_2)[env_id]
@@ -253,9 +254,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
         obj_pos = self._get_obj_pos()  # (num_envs, 3)
         ee_1 = self._get_ee_position(self.robot_1)
         ee_2 = self._get_ee_position(self.robot_2)
+        p1_pos = self.get_p1_pos()
         goal_pos = self.goal_pos
 
         rewards = torch.zeros((num_envs, num_phases), device=device)
+
+
+        dist_p1_ee = torch.norm(p1_pos - ee_1, dim=-1)
+        rewards[:, Phases.REACH_P1.value] = 2 * torch.exp(-self.cfg.dist_reward_scale * dist_p1_ee) * 100
 
         # phase 0: REACH_OBJ
         dist = torch.norm(obj_pos - ee_1, dim=-1)

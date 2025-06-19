@@ -6,29 +6,32 @@ import torch.nn.functional as F
 
 class Phases(Enum):
 
+
+    REACH_P1 = 0
     # Until reaching the object
-    REACH_OBJ = 0
+    REACH_OBJ = 1
     # R1 grips 1
     # until r1 opens the gripper
-    GRIP_1_OPEN = 1
+    GRIP_1_OPEN = 2
 
-    GRIP_1_CLOSE = 2
+    GRIP_1_CLOSE = 3
     # until r1 lifts the obj
-    LIFT = 3
+    LIFT = 4
     # R1 reaches goal 1
-    REACH_GOAL_1 = 4
+    REACH_GOAL_1 = 5
     # R2 reaches near ee of R1
-    REACH_GOAL_2 = 5
+    REACH_GOAL_2 = 6
     #R2 grips object
-    GRIP_2 = 6
+    GRIP_2 = 7
     #R1 releases object
-    RELEASE_1 = 7
+    RELEASE_1 = 8
     # Task completed
-    END = 8
+    END = 9
 
 class PhaseDetector:
-    def __init__(self, cfg):
+    def __init__(self, cfg, env):
         self.cfg = cfg
+        self.env = env
         # Distance thresholds for phase detection
         self.CLOSE_THRESHOLD = 0.05  # 5cm
         self.SUPER_CLOSE_THRESHOLD = 0.01  # 2cm
@@ -116,7 +119,8 @@ class PhaseDetector:
         robot_2_holding = self._is_holding_object(obj_position, robot_2)  # (num_envs,)
 
         obj_above_ground = self.is_object_above_ground(obj_position)      # (num_envs,)
-
+        p1_pos = self.env.get_p1_pos()
+        ee1_p1_dist = self._get_distance(ee_1_pos, p1_pos)
         ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)
         ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
         ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
@@ -129,6 +133,11 @@ class PhaseDetector:
         phase_mask = torch.zeros((num_envs, num_phases), dtype=torch.bool, device=device)
         # PHASE 0: REACH_OBJ
         
+
+        phase_mask[:, Phases.REACH_P1.value] = (
+            (ee1_p1_dist >= self.FAR_THRESHOLD) 
+        )
+
         phase_mask[:, Phases.REACH_OBJ.value] = (
             (ee1_obj_dist > self.GRIP_THRESHOLD) &
             (~obj_above_ground)
