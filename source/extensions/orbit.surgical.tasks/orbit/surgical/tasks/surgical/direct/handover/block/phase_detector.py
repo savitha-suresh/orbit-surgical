@@ -33,8 +33,8 @@ class PhaseDetector:
         self.CLOSE_THRESHOLD = 0.05  # 5cm
         self.SUPER_CLOSE_THRESHOLD = 0.01  # 2cm
         self.FAR_THRESHOLD = 0.15  # 15cm
-        self.GRIP_THRESHOLD = 0.015
-        self.GRIP_CLOSE_THRESHOLD = 0.009
+        self.GRIP_THRESHOLD = 0.05
+        self.GRIP_CLOSE_THRESHOLD = 0.05
         
     def _get_ee_position(self, robot):
         ee_pos = robot.data.body_pos_w[:, robot.find_bodies(self.cfg.ee_link_name)[0]]
@@ -102,111 +102,7 @@ class PhaseDetector:
         """Calculate Euclidean distance between two positions"""
         return torch.norm(pos1 - pos2, dim=-1)
     
-    # def get_phases(self, agents, batch_size, obj_position, goal_position, prev_phases) -> torch.Tensor:
-    #     """
-    #     Detect current phase for each environment
-    #     Returns tensor of Phases enum values for each environment
-    #     """
-        
-    #     phases = [Phases.REACH_OBJ] * batch_size  # Initialize with default phase
-        
-    #     # # # Get robot references
-    #     robot_1, robot_2 = agents
-        
-    #     # Get positions
-    #     ee_1_pos = self._get_ee_position(robot_1)
-    #     ee_2_pos = self._get_ee_position(robot_2)
-        
-    #     # Get object position (assuming you have this in your environment)
-        
-        
-    #     # Get gripper states
-    #     gripper_1_closed = self.is_gripper_closed(robot_1)
-    #     gripper_2_closed = self.is_gripper_closed(robot_2)
-        
-    #     # Check object holding states
-    #     robot_1_holding = self._is_holding_object(obj_position, robot_1)
-    #     robot_2_holding = self._is_holding_object(obj_position, robot_2)
-        
-    #     # Check if object is above ground
-    #     obj_above_ground = self.is_object_above_ground(obj_position)
-        
-    #     # Calculate distances
-    #     ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)
-    #     ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
-    #     ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
-       
-    #     # Phase detection logic
-    #     for i in range(batch_size):
-    #         # REACH_OBJ: ee_1 is far away from obj and obj is in ground
-    #         if (ee1_obj_dist[i] > self.FAR_THRESHOLD and 
-    #             not obj_above_ground[i]):# and prev_phases[i] == Phases.REACH_OBJ):
-    #             phases[i] = Phases.REACH_OBJ
-                
-    #         # GRIP_1: ee_1 is close to obj, obj is in ground, finger_1 is closed
-    #         elif (ee1_obj_dist[i] <= self.GRIP_THRESHOLD and 
-    #               not obj_above_ground[i]):# and
-    #               #( prev_phases[i] == Phases.REACH_OBJ or prev_phases[i] == Phases.GRIP_1_OPEN)):
-    #             phases[i] = Phases.GRIP_1_OPEN
-
-            
-    #         elif (ee1_obj_dist[i] <= self.GRIP_THRESHOLD and 
-    #               not obj_above_ground[i] and not gripper_1_closed[i]):
-    #         #       and (prev_phases[i] == Phases.GRIP_1_OPEN or prev_phases[i]== Phases.GRIP_1_CLOSE)):
-    #             phases[i] = Phases.GRIP_1_CLOSE
-                
-    #         # LIFT: ee_1 is super close to obj and obj is in ground, gripper_1 is open
-    #         elif (ee1_obj_dist[i] <= self.GRIP_THRESHOLD and 
-    #               not obj_above_ground[i] and gripper_1_closed[i] 
-    #               and (prev_phases[i] == Phases.GRIP_1_CLOSE or prev_phases[i]== Phases.LIFT)):
-    #             phases[i] = Phases.LIFT
-                
-    #         # REACH_GOAL_1: gripper_1 is holding obj, obj is above ground, gripper_1 closed, ee1 far away from goal_pos
-    #         elif (robot_1_holding[i] and 
-    #               obj_above_ground[i] and 
-                  
-    #               ee1_goal_dist[i] > self.FAR_THRESHOLD):
-    #             phases[i] = Phases.REACH_GOAL_1
-                
-    #         # REACH_GOAL_2: gripper_1 is holding obj, obj is above ground, gripper_1 closed, ee1 close to goal_pos and ee_2 is far away from goal_position
-    #         elif (robot_1_holding[i] and 
-    #               obj_above_ground[i] and 
-    #               gripper_1_closed[i] and 
-    #               ee1_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               ee2_goal_dist[i] > self.FAR_THRESHOLD):
-    #             phases[i] = Phases.REACH_GOAL_2
-                
-    #         # GRIP_2: gripper_1 is holding obj, obj is above ground, gripper_1 closed, ee1 close to goal_pos and ee_2 is near goal and gripper_2 is closed and gripper_2 not holding obj
-    #         elif (robot_1_holding[i] and 
-    #               obj_above_ground[i] and 
-    #               gripper_1_closed[i] and 
-    #               ee1_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               ee2_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               gripper_2_closed[i] and 
-    #               not robot_2_holding[i]):
-    #             phases[i] = Phases.GRIP_2
-                
-    #         # RELEASE_1: gripper_1 is holding obj, obj is above ground, gripper_1 closed, ee1 close to goal_pos and ee_2 is near goal and gripper_2 is closed and gripper_2 is holding obj
-    #         elif (robot_1_holding[i] and 
-    #               obj_above_ground[i] and 
-    #               gripper_1_closed[i] and 
-    #               ee1_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               ee2_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               gripper_2_closed[i] and 
-    #               robot_2_holding[i]):
-    #             phases[i] = Phases.RELEASE_1
-                
-    #         # END: gripper_1 is not holding obj, obj is above ground, ee1 close to goal_pos and ee_2 is near goal and gripper_2 is closed and gripper_2 is holding obj
-    #         elif (not robot_1_holding[i] and 
-    #               obj_above_ground[i] and 
-    #               ee1_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               ee2_goal_dist[i] <= self.CLOSE_THRESHOLD and 
-    #               gripper_2_closed[i] and 
-    #               robot_2_holding[i]):
-    #             phases[i] = Phases.END
-        
-    #     return phases
-
+    
     def get_phases(self, agents, batch_size, obj_position, goal_position, prev_phases):
         robot_1, robot_2 = agents
 
@@ -231,10 +127,10 @@ class PhaseDetector:
 
         # initialize all phases to False
         phase_mask = torch.zeros((num_envs, num_phases), dtype=torch.bool, device=device)
-
         # PHASE 0: REACH_OBJ
+        
         phase_mask[:, Phases.REACH_OBJ.value] = (
-            (ee1_obj_dist > self.FAR_THRESHOLD) &
+            (ee1_obj_dist > self.GRIP_THRESHOLD) &
             (~obj_above_ground)
         )
 
@@ -312,7 +208,7 @@ class PhaseDetector:
         # last_indices = phase_mask.size(1) - 1 - reversed_indices
         valid_mask = phase_mask.any(dim=1)  # (num_envs,) - which envs have any True phase
         phase_indices = torch.zeros(num_envs, dtype=torch.long, device=device)
-
+        #print(phase_mask)
     # For environments with True phases, find the maximum index where True
         if valid_mask.any():
             # Get the last True index for each row
@@ -320,6 +216,11 @@ class PhaseDetector:
             first_true_in_flipped = torch.argmax(flipped_mask.int(), dim=1)  # Get first True in flipped
             last_true_in_original = num_phases - 1 - first_true_in_flipped  # Convert back to original indexing
             phase_indices = torch.where(valid_mask, last_true_in_original, phase_indices)
-        one_hot = F.one_hot(phase_indices, num_classes=num_phases).float()  # (num_envs, num_phases)
 
-        return one_hot
+
+        prev_phase_indices = torch.argmax(prev_phases.int(), dim=1)
+        phase_regressed_mask = (phase_indices < prev_phase_indices)
+        phase_same_mask = (phase_indices == prev_phase_indices)
+        one_hot = F.one_hot(phase_indices, num_classes=num_phases).float()  # (num_envs, num_phases)
+        
+        return one_hot, phase_indices, phase_regressed_mask, phase_same_mask

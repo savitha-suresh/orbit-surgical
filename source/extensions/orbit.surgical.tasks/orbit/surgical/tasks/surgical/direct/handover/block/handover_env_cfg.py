@@ -172,10 +172,12 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     ee_link_name: str = "psm_tool_tip_link"
     reset_position_noise = 0.01
     reset_rot_noise = 0.1
-    fall_z_threshold = -0.05
+    fall_z_threshold = -0.01
     dist_reward_scale = 20.0
     act_moving_average = 1
     episode_length_s = 15
+    phase_regressed_penalty = -1
+    phase_same_penalty = -0.5
 
     actions: ActionsCfg = ActionsCfg()
     # Action/observation scaling constants

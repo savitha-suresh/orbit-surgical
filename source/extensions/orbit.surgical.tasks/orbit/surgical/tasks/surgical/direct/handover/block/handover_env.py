@@ -115,7 +115,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         observations = {}
         
-        
+        #print(self.phase_detector.get_gripper_width(self.robot_1))
         #print(self.current_phases)
         # Process each robot separately
         for robot_name in self.cfg.possible_agents:
@@ -128,32 +128,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
              
             joint_vel_rel = robot.data.joint_vel[:, joint_ids] - robot.data.default_joint_vel[:, joint_ids]
             
-            # 3. Object position in robot root frame
-           
-            # # 4. Target object position from command generator
-            # # You'll need to implement this based on your command generation logic
-            # if hasattr(self, 'command_manager') and self.command_manager is not None:
-            #     # If you have a command manager
-            #     target_commands = self.command_manager.get_command("object_pose")
-            #     if target_commands.shape[-1] >= 3:
-            #         target_object_pos = target_commands[:, :3]  # Take position part
-            #     else:
-            #         target_object_pos = target_commands
-            # else:
-            #     # Fallback: create dummy target or implement your own target logic
-            #     target_object_pos = torch.zeros((self.num_envs, 3), device=self.device)
-            #     # Example: You might want to set a specific target position
-            #     # target_object_pos = torch.tensor([[1.0, 0.0, 0.5]], device=self.device).repeat(self.num_envs, 1)
             
-            # 5. Last actions
-            # # Store previous actions in your environment (you'll need to track this)
-            # if hasattr(self, '_previous_actions') and robot_name in self._previous_actions:
-            #     last_actions = self._previous_actions[robot_name]
-            # else:
-            #     # Initialize with zeros if no previous actions
-            #     num_actions = getattr(self.cfg, 'num_actions', joint_pos.shape[1])  # Assume action dim equals joint dim
-            #     last_actions = torch.zeros((self.num_envs, num_actions), device=self.device)
-
             ee_pose = self._get_ee_pose(robot)
             # Concatenate all observations for this robot
             obs_list = [
@@ -174,65 +149,6 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return observations
     
 
-    def get_joint_ids_for_action(self, robot_name, robot):
-        phase_joint_names_map = {
-            Phases.REACH_OBJ: {
-                "robot_1": self.cfg.body_joint_names,
-            },
-            Phases.GRIP_1_OPEN: {
-                "robot_1": self.cfg.finger_joint_names,
-            },
-            Phases.LIFT: {
-                "robot_1": self.cfg.body_joint_names,
-            },
-            Phases.REACH_GOAL_1: {
-                "robot_1": self.cfg.body_joint_names,
-            },
-            Phases.REACH_GOAL_2: {
-                "robot_2": self.cfg.body_joint_names,
-            },
-            Phases.GRIP_2:  {
-                "robot_2": self.cfg.finger_joint_names,
-            },
-            Phases.RELEASE_1:  {
-                "robot_1": self.cfg.finger_joint_names,
-            },
-            Phases.END: {
-                "robot_1": self.cfg.body_joint_names,
-            },
-        }
-
-        phases = self._get_phase()
-        
-        env_joints = {}
-
-        
-        for env_id, phase in enumerate(phases):
-            joint_ids = []
-            robot_joint_map = phase_joint_names_map[phase]
-            joint_names = robot_joint_map.get(robot_name)
-            if not joint_names:
-                return {}
-            joint_ids = [robot.joint_names.index(name) for name in joint_names]
-            env_joints[env_id] = joint_ids
-        return env_joints
-    
-    def mask_actions(self, actions, env_joint_dict):
-        num_envs, num_joints = actions.shape
-        
-        # Create a mask initialized with zeros (all joints inactive by default)
-        mask = torch.zeros_like(actions, dtype=torch.bool, device=actions.device)
-        
-        # Set mask to True for active joints in each environment
-        for env_id, joint_ids in env_joint_dict.items():
-            if env_id < num_envs:  # Safety check
-                mask[env_id, joint_ids] = True
-        
-        # Apply mask: keep original actions for active joints, set others to 0
-        masked_actions = actions * mask.float()
-        
-        return masked_actions
-    
     def _apply_action(self):
 
         
@@ -244,36 +160,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
-        # self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
-        #     self.cfg.act_moving_average * self.robot_1_curr_targets[:, self.actuated_dof_indices]
-        #     + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets[:, self.actuated_dof_indices]
-        # )
-
-        # Only apply moving average if delta action is large
-        diff_1 = torch.abs(self.robot_1_curr_targets - self.robot_1_prev_targets)
-        diff_2 = torch.abs(self.robot_2_curr_targets - self.robot_2_prev_targets)
-
-        # Threshold below which we consider the arm to be "still"
-        STABILITY_THRESHOLD = 1e-3  # You can tune this
-
-        mask_1 = (diff_1 > STABILITY_THRESHOLD).float()
-        mask_2 = (diff_2 > STABILITY_THRESHOLD).float()
-
-        # Blend only if significant change
-        self.robot_1_curr_targets = (
-            mask_1 * (
-                self.cfg.act_moving_average * self.robot_1_curr_targets
-                + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets
-            ) + (1 - mask_1) * self.robot_1_prev_targets
+        self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+            self.cfg.act_moving_average * self.robot_1_curr_targets[:, self.actuated_dof_indices]
+            + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets[:, self.actuated_dof_indices]
         )
 
-        self.robot_2_curr_targets = (
-            mask_2 * (
-                self.cfg.act_moving_average * self.robot_2_curr_targets
-                + (1.0 - self.cfg.act_moving_average) * self.robot_2_prev_targets
-            ) + (1 - mask_2) * self.robot_2_prev_targets
-        )
-
+        
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
             self.robot_1_curr_targets[:, self.actuated_dof_indices],
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
@@ -296,26 +188,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
 
-        # env_joints_1 = self.get_joint_ids_for_action("robot_1",
-        #                                                 self.robot_1)
-        # env_joints_2 = self.get_joint_ids_for_action("robot_2", self.robot_2)
+        
 
-        # masked_actions_1 = self.mask_actions(self.robot_1_curr_targets, env_joints_1)
-        # masked_actions_2 = self.mask_actions(self.robot_2_curr_targets, env_joints_2)
-
-
-        # # save current targets
-        # self.robot_1_prev_targets = masked_actions_1
-        # self.robot_2_prev_targets = masked_actions_2
-
-        # # set targets
-        # self.robot_1.set_joint_position_target(
-        #     masked_actions_1
-        # )
-        # self.robot_2.set_joint_position_target(
-        #     masked_actions_2
-        # )
-
+        self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[
+            :, self.actuated_dof_indices
+        ]
+        self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[
+            :, self.actuated_dof_indices
+        ]
         self.robot_1.set_joint_position_target(
             self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
         )
@@ -334,29 +214,25 @@ class DualArmHandoverEnv(DirectMARLEnv):
     
 
     def _get_phase(self):
-        # self.prev_phases = self.current_phases
-        # self.current_phases = self.phase_detector.get_phases(
-        #     agents=[self.robot_1, self.robot_2],
-        #     obj_position=self._get_obj_pos(),
-        #     batch_size=self.num_envs,
-        #     goal_position=self.goal_pos,
-        #     prev_phases=self.prev_phases
-        # )
-        # return self.current_phases
-        self.current_phases = self.phase_detector.get_phases(
+        
+        self.current_phases, phase_indices, phase_regressed_mask, phase_same_mask = self.phase_detector.get_phases(
             agents=[self.robot_1, self.robot_2],
             obj_position=self._get_obj_pos(),
             batch_size=self.num_envs,
             goal_position=self.goal_pos,
             prev_phases = self.current_phases.clone()
         )
-        return self.current_phases
+        
+        return self.current_phases, phase_indices, phase_regressed_mask, phase_same_mask
 
     def _get_obj_pos(self):
         #return self.object.data.root_pos_w - self.scene.env_origin
         pos_all = self.object.data.root_pos_w
-        pos_all[:2]+=0.001
         return  pos_all
+    
+    def get_reach_p1(self):
+        obj_pos = self._get_obj_pos()
+        obj_pos[: , 2] += 0.1
     
     def _get_r2_stationary_rew(self, env_id):
         ee_position_2 = self._get_ee_position(self.robot_2)[env_id]
@@ -367,120 +243,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         return reward_2
     
-    # def _get_rewards(self):
-    #     phases = self._get_phase()
-        
-        
-    #     final_rewards = {}
-    #     for robot_name in self.cfg.possible_agents:
-    #         final_rewards[robot_name] = torch.zeros((self.num_envs,), dtype=torch.float, device=self.robot_1.data.device)
-    #     obj_pos_all = self._get_obj_pos()
-    #     # agent_name = 'robot_1'               
-    #     # robot = self.scene.articulations[agent_name]
-    #     # ee_position = self._get_ee_position(robot)
-    #     # dist = torch.norm(obj_pos_all - ee_position, p=2, dim=-1)
-        
-    #     # reward = 2 * torch.exp(-self.cfg.dist_reward_scale * dist)
-    #     # #print(reward, dist)
-    #     # final_rewards[agent_name] = reward
-        
-        
-    #     for env_id, phase in enumerate(phases):
-    #         obj_pos = obj_pos_all[env_id]
-    #         if phase == Phases.REACH_OBJ:
-    #             agent_name = 'robot_1'               
-    #             robot = self.robot_1
-    #             ee_position = self._get_ee_position(robot)[env_id]
-    #             dist = torch.norm(obj_pos.float() - ee_position.float(), p=2, dim=-1)
-                
-    #             reward = 2*torch.exp(-self.cfg.dist_reward_scale * dist)
-
-               
-    #             final_rewards['robot_2'][env_id] = self._get_r2_stationary_rew(env_id)
-                
-    #             final_rewards[agent_name][env_id] = reward
-
-    #         if phase == Phases.GRIP_1_OPEN:
-    #             # concetrate on opening the gripper
-    #             agent_name = 'robot_1'
-    #             gripper_width = self.phase_detector.get_gripper_width(self.robot_1)[env_id]
-    #             final_rewards[agent_name][env_id] = self.cfg.dist_reward_scale * gripper_width
-              
-    #             final_rewards['robot_2'][env_id] = self._get_r2_stationary_rew(env_id) 
-
-
-    #         if phase == Phases.GRIP_1_CLOSE:
-    #             agent_name = 'robot_1'
-    #             gripper_width = self.phase_detector.get_gripper_width(self.robot_1)[env_id]
-    #             final_rewards[agent_name][env_id] =  2*torch.exp(-self.cfg.dist_reward_scale * gripper_width)
-
-              
-    #             final_rewards['robot_2'][env_id] = self._get_r2_stationary_rew(env_id) 
-    #         if phase == Phases.LIFT:
-    #             agent_name = 'robot_1'
-    #             obj_pos_env = obj_pos_all[env_id]
-    #             height = obj_pos_env[2] - self.cfg.ground_height
-    #             final_rewards[agent_name][env_id] = self.cfg.dist_reward_scale * height
-                
-    #             final_rewards['robot_2'][env_id] = self._get_r2_stationary_rew(env_id)
-                
-            
-    #         if phase == Phases.REACH_GOAL_1:
-    #             agent_name = "robot_1"
-    #             robot = self.robot_1
-    #             ee_position = self._get_ee_position(robot)[env_id]
-    #             goal_pos = self.goal_pos[env_id]
-    #             dist = torch.norm(goal_pos.float() - ee_position.float(), dim=-1)
-    #             reward = torch.exp(-self.cfg.dist_reward_scale * dist)
-    #             final_rewards[agent_name][env_id] = reward
-    #             final_rewards['robot_2'][env_id] = self._get_r2_stationary_rew(env_id)
-                
-
-    #         if phase == Phases.REACH_GOAL_2:
-    #             agent_name = "robot_2"
-    #             robot = self.robot_2
-    #             ee_position = self._get_ee_position(robot)[env_id]
-    #             goal_pos = self.goal_pos[env_id]
-    #             dist = torch.norm(goal_pos.float() - ee_position.float(), dim=-1)
-    #             reward = torch.exp(-self.cfg.dist_reward_scale * dist)
-    #             final_rewards[agent_name][env_id] = reward
-
-    #         if phase == Phases.GRIP_2:
-    #             agent_name = 'robot_2'
-    #             is_holding_obj = self.phase_detector.is_holding_object(
-    #                 obj_pos_all, self.robot_2)[env_id]
-    #             if is_holding_obj:
-    #                 final_rewards[agent_name][env_id] = 10
-            
-    #         if phase == Phases.RELEASE_1:
-    #             agent_name = 'robot_2'
-    #             is_holding_obj = self.phase_detector.is_holding_object(
-    #                 obj_pos_all, self.robot_2)[env_id]
-    #             if is_holding_obj:
-    #                 final_rewards[agent_name][env_id] = 10
-
-    #             agent_name = 'robot_1'
-    #             is_holding_obj = self.phase_detector.is_holding_object(
-    #                 obj_pos_all, self.robot_1)[env_id]
-    #             if not is_holding_obj:
-    #                 final_rewards[agent_name][env_id] = 10
-
-
-    #         if phase == Phases.END:
-    #             agent_name = "robot_1"
-    #             robot = self.robot_1
-    #             ee_position = self._get_ee_position(robot)[env_id]
-    #             goal_pos = self.r1_init_pos
-    #             dist = torch.norm(goal_pos.float() - ee_position.float(), dim=-1)
-    #             reward = torch.exp(-self.cfg.dist_reward_scale * dist)
-    #             final_rewards[agent_name][env_id] = reward
-
-    #     return final_rewards
 
 
     def _get_rewards(self):
-        phases_one_hot = self._get_phase()  # shape (num_envs, num_phases)
-
+        phases_one_hot, phase_indices, phase_regressed_mask, phase_same_mask = self._get_phase()  # shape (num_envs, num_phases)
         num_envs, num_phases = phases_one_hot.shape
 
         device = self.robot_1.data.device
@@ -493,18 +259,19 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         # phase 0: REACH_OBJ
         dist = torch.norm(obj_pos - ee_1, dim=-1)
-        rewards[:, Phases.REACH_OBJ.value] = 2 * torch.exp(-self.cfg.dist_reward_scale * dist)
-
+        
+        rewards[:, Phases.REACH_OBJ.value] = 2 * torch.exp(-self.cfg.dist_reward_scale * dist) * 100
+    
         # phase 1: GRIP_1_OPEN
         gripper_width = self.phase_detector.get_gripper_width(self.robot_1)
-        rewards[:, Phases.GRIP_1_OPEN.value] = self.cfg.dist_reward_scale * gripper_width
-
+        rewards[:, Phases.GRIP_1_OPEN.value] = self.cfg.dist_reward_scale * gripper_width *100
+    
         # phase 2: GRIP_1_CLOSE
-        rewards[:, Phases.GRIP_1_CLOSE.value] = 4 * torch.exp(-self.cfg.dist_reward_scale * gripper_width)
-
+        rewards[:, Phases.GRIP_1_CLOSE.value] = 40 * torch.exp(-self.cfg.dist_reward_scale * gripper_width) * 100
         # phase 3: LIFT
         height = obj_pos[:, 2] - self.cfg.ground_height
-        rewards[:, Phases.LIFT.value] = self.cfg.dist_reward_scale * height
+        rewards[:, Phases.LIFT.value] = self.cfg.dist_reward_scale * height * 100
+        
 
         # phase 4: REACH_GOAL_1
         dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
@@ -529,9 +296,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards[:, Phases.END.value] = torch.exp(-self.cfg.dist_reward_scale * dist_home)
 
         # final reward for robot_1: dot product (envs × phases) ⊙ (envs × phases)
-        final_rewards_r1 = torch.sum(phases_one_hot * rewards, dim=1)  # (num_envs,)
+        mask_float = self.not_visited_mask.float()
+        final_rewards_r1 = torch.sum(phases_one_hot * rewards * mask_float, dim=1)  # (num_envs,)
+        final_rewards_r1[phase_regressed_mask] += self.cfg.phase_regressed_penalty
+        final_rewards_r1[phase_same_mask] += self.cfg.phase_same_penalty
         final_rewards_r2 = torch.zeros((self.num_envs,), dtype=torch.float, device=self.robot_1.data.device)
-
+        self.not_visited_mask[torch.arange(self.num_envs), phase_indices] = False
         return {
             "robot_1": final_rewards_r1,
             "robot_2": final_rewards_r2
@@ -539,7 +309,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
     def _get_dones(self):
         self._compute_intermediate_values()
-        obj_pos_z = self.object.data.root_pos_w[:, 2] - self.scene.env_origins[:, 2]
+        obj_pos_z = self.object.data.root_pos_w[:, 2]
         fallen = obj_pos_z < self.cfg.fall_z_threshold
         timeout = self.episode_length_buf >= self.max_episode_length - 1
         return (
@@ -549,12 +319,15 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
     def _reset_idx(self, env_ids):
         super()._reset_idx(env_ids)
+        # Set to True — all phases are not visited initially
+        self.not_visited_mask = torch.ones((self.num_envs, len(Phases)), dtype=torch.bool, device=self.device)
+
         # Reset object pose with some noise
         pos_noise = self.cfg.reset_position_noise * sample_uniform(-1, 1, (len(env_ids), 3), self.device)
         rot_noise = self.cfg.reset_rot_noise * sample_uniform(-1, 1, (len(env_ids), 2), self.device)
         new_pos = self.scene.env_origins[env_ids] + pos_noise
         new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
-        new_rot[0] = torch.tensor([0.5, 0.5, 0.5, 0.5])
+        # new_rot[0] = torch.tensor([0.5, 0.5, 0.5, 0.5])
        
         
         
