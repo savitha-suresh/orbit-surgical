@@ -15,6 +15,7 @@ from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransformerCfg
+from isaaclab.markers import VisualizationMarkersCfg
 
 from dataclasses import MISSING
 
@@ -68,6 +69,30 @@ class EventCfg:
             "pose_range": {"x": (-0.05, 0.05), "y": (-0.05, 0.05), "z": (-0.1, -0.1)},
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("object", body_names="Object"),
+        },
+    )
+
+    object_physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        min_step_count_between_reset=720,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("object"),
+            "static_friction_range": (0.7, 1.3),
+            "dynamic_friction_range": (1.0, 1.0),
+            "restitution_range": (1.0, 1.0),
+            "num_buckets": 250,
+        },
+    )
+    object_scale_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        min_step_count_between_reset=720,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("object"),
+            "mass_distribution_params": (0.5, 1.5),
+            "operation": "scale",
+            "distribution": "uniform",
         },
     )
 
@@ -129,8 +154,8 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     possible_agents = ["robot_1", "robot_2"]
     # action - 7, obs - 33 in the manager
     action_spaces = {"robot_1": 8, "robot_2": 8}  # IK target delta pose
-    observation_spaces = {"robot_1": 33, "robot_2": 33}  # example dim (can be tuned)
-    state_space = 66  # combined
+    observation_spaces = {"robot_1": 36, "robot_2": 36}  # example dim (can be tuned)
+    state_space = 72  # combined
     ground_height=0.0149
     events: EventCfg = EventCfg()
     commands: CommandsCfg = CommandsCfg()
@@ -168,16 +193,40 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     # Scene
     scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=4096, env_spacing=2.5)
 
+    p1_pos_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.005,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.4, 0.3, 1.0)),
+                    ),
+                },
+            )
+    
+    obj_pos_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.005,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.5, 0.0)),
+                    ),
+                },
+            )
+
     # Constants for logic (used in reward, reset, etc.)
     ee_link_name: str = "psm_tool_tip_link"
     reset_position_noise = 0.01
     reset_rot_noise = 0.1
+    reset_dof_pos_noise = 0.2  # range of dof pos at reset
+    reset_dof_vel_noise = 0.0  # range of dof vel at reset
     fall_z_threshold = -0.01
     dist_reward_scale = 20.0
+    dist_reward_scale_reach_obj = 25
+    reward_scale = 10
     act_moving_average = 1
     episode_length_s = 15
-    phase_regressed_penalty = -1
-    phase_same_penalty = -0.5
+    phase_regressed_penalty = 0
+    phase_same_penalty = 0
 
     actions: ActionsCfg = ActionsCfg()
     # Action/observation scaling constants
@@ -193,4 +242,5 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
         self.sim.dt = 0.01  # 100Hz
         self.viewer.eye = (0.0, 0.5, 0.2)
         self.viewer.lookat = (0.0, 0.0, 0.05)
+        
 

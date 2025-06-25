@@ -127,7 +127,7 @@ def main():
         resume_path = os.path.abspath(args_cli.checkpoint)
     else:
         resume_path = get_checkpoint_path(
-            log_root_path, run_dir=f".*_{algorithm}_{args_cli.ml_framework}", other_dirs=["checkpoints"]
+            log_root_path, run_dir=f".*_{algorithm}_{args_cli.ml_framework}", other_dirs=["checkpoints"], checkpoint="best_agent"
         )
     log_dir = os.path.dirname(os.path.dirname(resume_path))
 

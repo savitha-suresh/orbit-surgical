@@ -33,11 +33,11 @@ class PhaseDetector:
         self.cfg = cfg
         self.env = env
         # Distance thresholds for phase detection
-        self.CLOSE_THRESHOLD = 0.05  # 5cm
+        self.CLOSE_THRESHOLD = 0.01  # 5cm
         self.SUPER_CLOSE_THRESHOLD = 0.01  # 2cm
         self.FAR_THRESHOLD = 0.15  # 15cm
-        self.GRIP_THRESHOLD = 0.05
-        self.GRIP_CLOSE_THRESHOLD = 0.05
+        self.GRIP_THRESHOLD = 0.01
+        self.GRIP_CLOSE_THRESHOLD = 0.01
         
     def _get_ee_position(self, robot):
         ee_pos = robot.data.body_pos_w[:, robot.find_bodies(self.cfg.ee_link_name)[0]]
@@ -119,97 +119,105 @@ class PhaseDetector:
         robot_2_holding = self._is_holding_object(obj_position, robot_2)  # (num_envs,)
 
         obj_above_ground = self.is_object_above_ground(obj_position)      # (num_envs,)
-        p1_pos = self.env.get_p1_pos()
+        p1_pos = self.env.get_p1_pos(obj_position)
         ee1_p1_dist = self._get_distance(ee_1_pos, p1_pos)
         ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)
         ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
         ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
-
+        
         num_envs = batch_size
         num_phases = len(Phases)
         device = ee_1_pos.device
-
         # initialize all phases to False
         phase_mask = torch.zeros((num_envs, num_phases), dtype=torch.bool, device=device)
         # PHASE 0: REACH_OBJ
         
-
+        #print(f"ee_p1 {ee1_p1_dist} obj to ee {ee1_obj_dist}")
         phase_mask[:, Phases.REACH_P1.value] = (
-            (ee1_p1_dist >= self.FAR_THRESHOLD) 
+            (ee1_p1_dist > self.CLOSE_THRESHOLD) 
+        )
+        # print((prev_phases))
+        #print("ARE", self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos))
+        phase_mask[:, Phases.REACH_OBJ.value] =  (
+            (
+                (ee1_p1_dist <= self.CLOSE_THRESHOLD) 
+                |
+                (
+                    self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos) &
+                    (ee1_obj_dist > self.GRIP_THRESHOLD) &
+                    ~self.env.not_visited_mask[:, Phases.REACH_P1.value]
+                )
+            )
+            & (~obj_above_ground)
         )
 
-        phase_mask[:, Phases.REACH_OBJ.value] = (
-            (ee1_obj_dist > self.GRIP_THRESHOLD) &
-            (~obj_above_ground)
-        )
+       # PHASE 1: GRIP_1_OPEN
+        # phase_mask[:, Phases.GRIP_1_OPEN.value] = (
+        #     (ee1_obj_dist <= self.GRIP_THRESHOLD) & 
+        #     (~obj_above_ground) & ( prev_phases[:, Phases.REACH_OBJ.value] | prev_phases[:, Phases.GRIP_1_OPEN.value])
+        # )
 
-        # PHASE 1: GRIP_1_OPEN
-        phase_mask[:, Phases.GRIP_1_OPEN.value] = (
-            (ee1_obj_dist <= self.GRIP_THRESHOLD) &
-            (~obj_above_ground) & ( prev_phases[:, Phases.REACH_OBJ.value] | prev_phases[:, Phases.GRIP_1_OPEN.value])
-        )
+        # # PHASE 2: GRIP_1_CLOSE
+        # phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
+        #     (ee1_obj_dist <= self.GRIP_CLOSE_THRESHOLD) &
+        #     (~obj_above_ground) &
+        #     (~gripper_1_closed) & (prev_phases[:, Phases.GRIP_1_OPEN.value] | prev_phases[:, Phases.GRIP_1_CLOSE.value])
+        # )
 
-        # PHASE 2: GRIP_1_CLOSE
-        phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
-            (ee1_obj_dist <= self.GRIP_CLOSE_THRESHOLD) &
-            (~obj_above_ground) &
-            (~gripper_1_closed) & (prev_phases[:, Phases.GRIP_1_OPEN.value] | prev_phases[:, Phases.GRIP_1_CLOSE.value])
-        )
+        # # PHASE 3: LIFT
+        # phase_mask[:, Phases.LIFT.value] = (
+        #     (ee1_obj_dist <= self.GRIP_CLOSE_THRESHOLD) &
+        #     (~obj_above_ground) &
+        #     gripper_1_closed & (prev_phases[:, Phases.GRIP_1_CLOSE.value] | prev_phases[:, Phases.LIFT.value])
+        # )
 
-        # PHASE 3: LIFT
-        phase_mask[:, Phases.LIFT.value] = (
-            (ee1_obj_dist <= self.GRIP_CLOSE_THRESHOLD) &
-            (~obj_above_ground) &
-            gripper_1_closed & (prev_phases[:, Phases.GRIP_1_CLOSE.value] | prev_phases[:, Phases.LIFT.value])
-        )
+        # # PHASE 4: REACH_GOAL_1
+        # phase_mask[:, Phases.REACH_GOAL_1.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     (ee1_goal_dist > self.FAR_THRESHOLD)
+        # )
 
-        # PHASE 4: REACH_GOAL_1
-        phase_mask[:, Phases.REACH_GOAL_1.value] = (
-            robot_1_holding &
-            obj_above_ground &
-            (ee1_goal_dist > self.FAR_THRESHOLD)
-        )
+        # # PHASE 5: REACH_GOAL_2
+        # phase_mask[:, Phases.REACH_GOAL_2.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     gripper_1_closed &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist > self.FAR_THRESHOLD)
+        # )
 
-        # PHASE 5: REACH_GOAL_2
-        phase_mask[:, Phases.REACH_GOAL_2.value] = (
-            robot_1_holding &
-            obj_above_ground &
-            gripper_1_closed &
-            (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
-            (ee2_goal_dist > self.FAR_THRESHOLD)
-        )
+        # # PHASE 6: GRIP_2
+        # phase_mask[:, Phases.GRIP_2.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     gripper_1_closed &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     gripper_2_closed &
+        #     (~robot_2_holding)
+        # )
 
-        # PHASE 6: GRIP_2
-        phase_mask[:, Phases.GRIP_2.value] = (
-            robot_1_holding &
-            obj_above_ground &
-            gripper_1_closed &
-            (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
-            (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
-            gripper_2_closed &
-            (~robot_2_holding)
-        )
+        # # PHASE 7: RELEASE_1
+        # phase_mask[:, Phases.RELEASE_1.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     gripper_1_closed &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     gripper_2_closed &
+        #     robot_2_holding
+        # )
 
-        # PHASE 7: RELEASE_1
-        phase_mask[:, Phases.RELEASE_1.value] = (
-            robot_1_holding &
-            obj_above_ground &
-            gripper_1_closed &
-            (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
-            (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
-            gripper_2_closed &
-            robot_2_holding
-        )
-
-        # PHASE 8: END
-        phase_mask[:, Phases.END.value] = (
-            (~robot_1_holding) &
-            obj_above_ground &
-            (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
-            (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
-            gripper_2_closed &
-            robot_2_holding
-        )
+        # # PHASE 8: END
+        # phase_mask[:, Phases.END.value] = (
+        #     (~robot_1_holding) &
+        #     obj_above_ground &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     gripper_2_closed &
+        #     robot_2_holding
+        # )
         
         # priority logic: use highest index where True
         # reversed_mask = phase_mask.flip(dims=[1])
@@ -226,10 +234,10 @@ class PhaseDetector:
             last_true_in_original = num_phases - 1 - first_true_in_flipped  # Convert back to original indexing
             phase_indices = torch.where(valid_mask, last_true_in_original, phase_indices)
 
-
+        
         prev_phase_indices = torch.argmax(prev_phases.int(), dim=1)
         phase_regressed_mask = (phase_indices < prev_phase_indices)
         phase_same_mask = (phase_indices == prev_phase_indices)
         one_hot = F.one_hot(phase_indices, num_classes=num_phases).float()  # (num_envs, num_phases)
-        
+        #print(phase_indices, one_hot)
         return one_hot, phase_indices, phase_regressed_mask, phase_same_mask
