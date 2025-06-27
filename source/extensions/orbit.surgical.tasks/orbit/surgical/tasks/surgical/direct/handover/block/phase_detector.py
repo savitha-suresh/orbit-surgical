@@ -4,6 +4,12 @@ from typing import Dict, Any
 from enum import Enum
 import torch.nn.functional as F
 
+
+def log_if(condition, *args, **kwargs):
+    if condition:
+        print(*args, **kwargs)
+
+
 class Phases(Enum):
 
 
@@ -132,7 +138,7 @@ class PhaseDetector:
         phase_mask = torch.zeros((num_envs, num_phases), dtype=torch.bool, device=device)
         # PHASE 0: REACH_OBJ
         
-        #print(f"ee_p1 {ee1_p1_dist} obj to ee {ee1_obj_dist}")
+        log_if(not self.cfg.is_training, f"ee_p1 {ee1_p1_dist} obj to ee {ee1_obj_dist}")
         phase_mask[:, Phases.REACH_P1.value] = (
             (ee1_p1_dist > self.CLOSE_THRESHOLD) 
         )
@@ -140,8 +146,7 @@ class PhaseDetector:
         #print("ARE", self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos))
         phase_mask[:, Phases.REACH_OBJ.value] =  (
             (
-                (ee1_p1_dist <= self.CLOSE_THRESHOLD) 
-                |
+                (ee1_p1_dist <= self.CLOSE_THRESHOLD) |
                 (
                     self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos) &
                     (ee1_obj_dist > self.GRIP_THRESHOLD) &
@@ -158,18 +163,19 @@ class PhaseDetector:
         # )
 
         # # PHASE 2: GRIP_1_CLOSE
-        # phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
-        #     (ee1_obj_dist <= self.GRIP_CLOSE_THRESHOLD) &
-        #     (~obj_above_ground) &
-        #     (~gripper_1_closed) & (prev_phases[:, Phases.GRIP_1_OPEN.value] | prev_phases[:, Phases.GRIP_1_CLOSE.value])
-        # )
+        phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
+            (ee1_obj_dist <= self.GRIP_THRESHOLD) &
+            (~obj_above_ground) &
+            (~gripper_1_closed) & 
+            ~self.env.not_visited_mask[:, Phases.REACH_P1.value]
+        )
 
         # # PHASE 3: LIFT
-        # phase_mask[:, Phases.LIFT.value] = (
-        #     (ee1_obj_dist <= self.GRIP_CLOSE_THRESHOLD) &
-        #     (~obj_above_ground) &
-        #     gripper_1_closed & (prev_phases[:, Phases.GRIP_1_CLOSE.value] | prev_phases[:, Phases.LIFT.value])
-        # )
+        phase_mask[:, Phases.LIFT.value] = (
+            (ee1_obj_dist <= self.GRIP_THRESHOLD) &
+            (~obj_above_ground) &
+            gripper_1_closed & ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value]
+        )
 
         # # PHASE 4: REACH_GOAL_1
         # phase_mask[:, Phases.REACH_GOAL_1.value] = (
@@ -239,5 +245,5 @@ class PhaseDetector:
         phase_regressed_mask = (phase_indices < prev_phase_indices)
         phase_same_mask = (phase_indices == prev_phase_indices)
         one_hot = F.one_hot(phase_indices, num_classes=num_phases).float()  # (num_envs, num_phases)
-        #print(phase_indices, one_hot)
+        log_if(not self.cfg.is_training, phase_indices, one_hot)
         return one_hot, phase_indices, phase_regressed_mask, phase_same_mask

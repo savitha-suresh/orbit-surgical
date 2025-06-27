@@ -154,8 +154,8 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     possible_agents = ["robot_1", "robot_2"]
     # action - 7, obs - 33 in the manager
     action_spaces = {"robot_1": 8, "robot_2": 8}  # IK target delta pose
-    observation_spaces = {"robot_1": 36, "robot_2": 36}  # example dim (can be tuned)
-    state_space = 72  # combined
+    observation_spaces = {"robot_1": 47, "robot_2": 47}  # example dim (can be tuned)
+    state_space = 94  # combined
     ground_height=0.0149
     events: EventCfg = EventCfg()
     commands: CommandsCfg = CommandsCfg()
@@ -214,7 +214,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
             )
 
     # Constants for logic (used in reward, reset, etc.)
-    ee_link_name: str = "psm_tool_tip_link"
+    ee_link_name: str = "psm_tool_gripper1_link"
     reset_position_noise = 0.01
     reset_rot_noise = 0.1
     reset_dof_pos_noise = 0.2  # range of dof pos at reset
@@ -225,7 +225,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     reward_scale = 10
     act_moving_average = 1
     episode_length_s = 15
-    phase_regressed_penalty = 0
+    phase_regressed_penalty = -200
     phase_same_penalty = 0
 
     actions: ActionsCfg = ActionsCfg()
@@ -237,7 +237,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
         # general settings
         self.decimation = 2
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 15.0
+        self.episode_length_s = 5
         # simulation settings
         self.sim.dt = 0.01  # 100Hz
         self.viewer.eye = (0.0, 0.5, 0.2)

@@ -7,7 +7,7 @@ from isaaclab.utils.math import sample_uniform, quat_from_angle_axis, quat_mul, 
 from isaaclab.utils.math import subtract_frame_transforms
 
 from .joint_pos_env_cfg import BlockHandoverEnvCfg
-from .phase_detector import Phases, PhaseDetector
+from .phase_detector import Phases, PhaseDetector, log_if
 from isaaclab.markers import VisualizationMarkers
 
 
@@ -33,7 +33,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
 
 
-
+        self.phase_regressed_mask = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
         self.num_hand_dofs = self.robot_1.num_joints
         self.actuated_dof_indices = []
         for joint_name in self.robot_1.joint_names:
@@ -144,13 +144,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 ee_pose,
                 self.goal_pos,
                 self.goal_rot,
-                self.get_p1_pos(obj_pos)
+                self.get_p1_pos(obj_pos),
+                self.not_visited_mask,
+                self.phase_regressed_mask.unsqueeze(1)
+                # ~self.not_visited_mask[:, Phases.REACH_P1.value].unsqueeze(1)
+               
             ]
             
             # Concatenate along the feature dimension
             robot_obs = torch.cat(obs_list, dim=-1)
             
-           
             observations[robot_name] = robot_obs
     
         return observations
@@ -253,7 +256,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
             goal_position=self.goal_pos,
             prev_phases = self.current_phases.clone()
         )
-        
+        self.phase_regressed_mask = phase_regressed_mask
         return self.current_phases, phase_indices, phase_regressed_mask, phase_same_mask
 
     def _get_obj_pos(self):
@@ -289,13 +292,20 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return reward_2
     
 
-    def is_point_between_parallel_lines(self, obj_position, p1_pos, ee_pos, margin=0.05):
+    def is_point_between_parallel_lines(self, obj_position, p1_pos, ee_pos, margin=0.03):
         
         
         x_min = torch.min(obj_position[:, 0], p1_pos[:, 0]) - margin
         x_max = torch.max(obj_position[:, 0], p1_pos[:, 0]) + margin
         return (ee_pos[:, 0] >= x_min) & (ee_pos[:, 0] <= x_max)
 
+
+    def is_point_between_parallel_lines_done(self, obj_position, p1_pos, ee_pos, margin=0.01):
+        
+        
+        x_min = torch.min(obj_position[:, 0], p1_pos[:, 0]) + margin
+        x_max = torch.max(obj_position[:, 0], p1_pos[:, 0]) - margin
+        return (ee_pos[:, 0] >= x_min) & (ee_pos[:, 0] <= x_max)
 
 
     def _get_rewards(self):
@@ -307,7 +317,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         ee_2 = self._get_ee_position(self.robot_2)
         p1_pos = self.get_p1_pos(obj_pos)
         goal_pos = self.goal_pos
-
+        log_if(not self.cfg.is_training, "phase_regressed_mask", phase_regressed_mask)
         rewards = torch.zeros((num_envs, num_phases), device=device)
 
 
@@ -315,31 +325,52 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         rewards[:, Phases.REACH_P1.value] = 2 * torch.exp(-50 * dist_p1_ee) 
         env_ids = torch.arange(self.num_envs)
-        mask = (dist_p1_ee <= self.phase_detector.CLOSE_THRESHOLD) & self.not_visited_mask[env_ids, Phases.REACH_P1.value]
+        mask = (dist_p1_ee <= self.phase_detector.CLOSE_THRESHOLD) & (self.not_visited_mask[env_ids, Phases.REACH_P1.value] 
+                    & (phases_one_hot[env_ids, Phases.REACH_OBJ.value].bool()))
 
         #print("visited", self.not_visited_mask, mask, self.not_visited_mask[env_ids, Phases.REACH_P1.value])
         self.not_visited_mask[mask, Phases.REACH_P1.value] = False
-        rewards[mask, Phases.REACH_OBJ.value] += 2
+        rewards[mask, Phases.REACH_OBJ.value] += 2000
         #print("rew", rewards)
         # phase 0: REACH_OBJ
-        z_dist = torch.norm(obj_pos - ee_1, dim=-1)
+        dist_obj_ee = torch.norm(obj_pos - ee_1, dim=-1)
         
-        rewards[:, Phases.REACH_OBJ.value] +=  2+(
-            2* torch.exp(-40 * z_dist)
+        rewards[:, Phases.REACH_OBJ.value] +=  (
+            2* torch.exp(-50 * dist_obj_ee)
         )
+        
 
         # print("dist obj ee", dist)
-        #rewards[:, Phases.REACH_OBJ.value] = 2 * torch.exp(-self.cfg.dist_reward_scale_reach_obj * z_dist) * self.cfg.reward_scale
-    
+        
         # phase 1: GRIP_1_OPEN
         gripper_width = self.phase_detector.get_gripper_width(self.robot_1)
-        rewards[:, Phases.GRIP_1_OPEN.value] = self.cfg.dist_reward_scale * gripper_width * self.cfg.reward_scale
-    
+        #rewards[:, Phases.GRIP_1_OPEN.value] = self.cfg.dist_reward_scale * gripper_width * self.cfg.reward_scale
+        
+
+        mask_ro = (dist_obj_ee <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & (
+                    self.not_visited_mask[env_ids, Phases.REACH_OBJ.value] & 
+                    (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE.value].bool()))
+
+        
+        self.not_visited_mask[mask_ro, Phases.REACH_OBJ.value] = False
+        rewards[mask_ro, Phases.GRIP_1_CLOSE.value] += 2000
         # phase 2: GRIP_1_CLOSE
-        rewards[:, Phases.GRIP_1_CLOSE.value] = 40 * torch.exp(-self.cfg.dist_reward_scale * gripper_width) * self.cfg.reward_scale
+        rewards[:, Phases.GRIP_1_CLOSE.value] += 2* torch.exp(-50 * gripper_width)
+
+
+        mask_close = self.phase_detector.is_gripper_closed(self.robot_1) & (
+                        self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value] 
+                            & ~self.not_visited_mask[env_ids, Phases.REACH_OBJ.value]) & (
+                                phases_one_hot[env_ids, Phases.LIFT.value].bool()
+                            )
+
+        
+        self.not_visited_mask[mask_close, Phases.GRIP_1_CLOSE.value] = False
+        rewards[mask_close, Phases.LIFT.value] += 2000
+
         # phase 3: LIFT
         height = obj_pos[:, 2] - self.cfg.ground_height
-        rewards[:, Phases.LIFT.value] = self.cfg.dist_reward_scale * height * self.cfg.reward_scale
+        rewards[:, Phases.LIFT.value] += 10 * height
         
 
         # phase 4: REACH_GOAL_1
@@ -372,10 +403,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         final_rewards_r1[phase_regressed_mask] += self.cfg.phase_regressed_penalty
         
         final_rewards_r2 = torch.zeros((self.num_envs,), dtype=torch.float, device=self.robot_1.data.device)
-        self.phase_visit_counts[torch.arange(self.num_envs), phase_indices] += 1
         
         
-        #print("rewards", final_rewards_r1)
+        log_if(not self.cfg.is_training, "visited", self.not_visited_mask)
+        log_if(not self.cfg.is_training, f"rewards {final_rewards_r1} rewards_all {rewards}, phases one {phases_one_hot}")
         
         return {
             "robot_1": final_rewards_r1,
@@ -387,9 +418,25 @@ class DualArmHandoverEnv(DirectMARLEnv):
         obj_pos_z = self.object.data.root_pos_w[:, 2]
         fallen = obj_pos_z < self.cfg.fall_z_threshold
         timeout = self.episode_length_buf >= self.max_episode_length - 1
+
+
+
+        # if ee reaches between p1 and obj before it reaches p1, stop the env
+        ee1_pos = self._get_ee_position(self.robot_1)
+        obj_pos = self._get_obj_pos()
+        p1_pos = self.get_p1_pos(obj_pos)
+        # if ee has not visited p1 but is inbetween p1 and obj end the env
+        invalid_move = self.is_point_between_parallel_lines_done(obj_pos, p1_pos, ee1_pos) & self.not_visited_mask[:, Phases.REACH_P1.value]
+        
+        # for now i am setting this for both, because i want to be sure env ends
+        #print("invalid move", self.is_point_between_parallel_lines_done(obj_pos, p1_pos, ee1_pos, ), self.not_visited_mask[:, Phases.REACH_P1.value])
+        # if self.common_step_counter > 30000:
+        #     terminated = fallen | invalid_move
+        # else:
+        terminated = fallen #| self.phase_regressed_mask
         return (
-            {agent: fallen.clone() for agent in self.cfg.possible_agents},
-            {agent: timeout.clone() for agent in self.cfg.possible_agents},
+            {agent: terminated.clone()  for agent in self.cfg.possible_agents},
+            {agent: timeout.clone() for agent in self.cfg.possible_agents}
         )
 
 
@@ -398,7 +445,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         super()._reset_idx(env_ids)
        
-        
+        self.phase_regressed_mask = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
         # Set to True — all phases are not visited initially
         self.not_visited_mask = torch.ones((self.num_envs, len(Phases)), dtype=torch.bool, device=self.device)
         # In __init__ or reset()

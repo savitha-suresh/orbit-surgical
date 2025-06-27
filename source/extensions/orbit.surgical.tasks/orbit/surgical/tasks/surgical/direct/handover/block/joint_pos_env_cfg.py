@@ -118,6 +118,7 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
                 ),
             ],
         )
+        self.is_training = True
         
     
 
@@ -130,5 +131,6 @@ class BlockHandoverEnvCfg_PLAY(BlockHandoverEnvCfg):
         # make a smaller scene for play
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
+        self.is_training = False
         # disable randomization for play
         #self.observations.policy.enable_corruption = False
