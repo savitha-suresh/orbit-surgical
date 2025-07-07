@@ -22,8 +22,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.ee_link_name = self.cfg.ee_link_name
         self.goal_rot = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
         self.goal_rot[:, 0] = 1.0
-        self.goal_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
-        self.goal_pos[:, :] = torch.tensor([0.0, 0.0, 0.1], device=self.device)
+        
 
         self.r1_init_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         self.r1_init_pos[:, :] = torch.tensor([0.18, 0.0, 0.15], device=self.device)
@@ -62,6 +61,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         self.goal_markers = VisualizationMarkers(self.cfg.p1_pos_cfg)
         self.goal_markers_obj = VisualizationMarkers(self.cfg.obj_pos_cfg)
+        self.markers_goal = VisualizationMarkers(self.cfg.goal_pos_cfg)
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
         self.hand_dof_upper_limits = joint_pos_limits[..., 1]
@@ -87,9 +87,11 @@ class DualArmHandoverEnv(DirectMARLEnv):
     
         self.actions = actions
         obj_pos = self._get_obj_pos()
-        self.goal_markers_obj.visualize(self._get_obj_pos())
+        self.goal_markers_obj.visualize(obj_pos)
         p1_pos = self.get_p1_pos(obj_pos)
         self.goal_markers.visualize(p1_pos)
+        goal_pos = self.get_goal_pos(obj_pos)
+        self.markers_goal.visualize(goal_pos)
         
 
     def _compute_intermediate_values(self):
@@ -126,118 +128,219 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # Process each robot separately
         for robot_name in self.cfg.possible_agents:
             robot = self.scene.articulations[robot_name]
- 
+            
             # Resolve joint IDs
             joint_ids = [robot.joint_names.index(name) for name in robot.joint_names]
-  
+            
+            # Keep relative joint positions (this is already good)
             joint_pos_rel = robot.data.joint_pos[:, joint_ids] - robot.data.default_joint_pos[:, joint_ids]
-             
             joint_vel_rel = robot.data.joint_vel[:, joint_ids] - robot.data.default_joint_vel[:, joint_ids]
             
+            # Get current poses
             obj_pos = self._get_obj_pos()
-            ee_pose = self._get_ee_pose(robot)
-            # Concatenate all observations for this robot
+            ee_pose = self._get_ee_position(robot)
+            
+            # RELATIVE OBSERVATIONS - Key changes here
+            # 1. End-effector to object vector (relative position)
+            ee_to_obj = obj_pos - ee_pose  # Assuming ee_pose has position in first 3 dims
+            
+            # 2. End-effector to goal vector (relative position)
+            goal_pos = self.get_goal_pos(obj_pos)
+            ee_to_goal = goal_pos - ee_pose
+            
+            # 3. Object to goal vector (relative position)
+            obj_to_goal = goal_pos - obj_pos
+            
+            # 4. Distance metrics (scale-invariant)
+            ee_to_obj_distance = torch.norm(ee_to_obj, dim=-1, keepdim=True)
+            ee_to_goal_distance = torch.norm(ee_to_goal, dim=-1, keepdim=True)
+            obj_to_goal_distance = torch.norm(obj_to_goal, dim=-1, keepdim=True)
+            
+            # 5. Normalized direction vectors
+            ee_to_obj_dir = ee_to_obj / (ee_to_obj_distance + 1e-8)
+            ee_to_goal_dir = ee_to_goal / (ee_to_goal_distance + 1e-8)
+            obj_to_goal_dir = obj_to_goal / (obj_to_goal_distance + 1e-8)
+            
+            
+            
+            # 7. Get relative position to waypoints
+            p1_pos = self.get_p1_pos(obj_pos)
+            ee_to_p1 = p1_pos - ee_pose[:, :3]
+            ee_to_p1_dir = ee_to_p1 / (torch.norm(ee_to_p1, dim=-1, keepdim=True) + 1e-8)
+            
+            # Concatenate RELATIVE observations
             obs_list = [
-                joint_pos_rel,
-                joint_vel_rel,
-                obj_pos,
-                ee_pose,
-                self.goal_pos,
-                self.goal_rot,
-                self.get_p1_pos(obj_pos),
-                self.not_visited_mask,
+                joint_pos_rel,                    # Joint positions (already relative)
+                joint_vel_rel,                    # Joint velocities (already relative)
+                ee_to_obj,                        # Vector from EE to object
+                ee_to_goal,                       # Vector from EE to goal
+                obj_to_goal,                      # Vector from object to goal
+                ee_to_p1,                         # Vector from EE to waypoint
+                ee_to_obj_distance,               # Distance to object
+                ee_to_goal_distance,              # Distance to goal
+                ee_to_obj_dir,                    # Direction to object (normalized)
+                ee_to_goal_dir,                   # Direction to goal (normalized)
+                obj_to_goal_dir,                  # Direction object should move
+                ee_to_p1_dir,                     # Direction to waypoint
+                self.not_visited_mask,            # Task phase info
                 self.phase_regressed_mask.unsqueeze(1)
-                # ~self.not_visited_mask[:, Phases.REACH_P1.value].unsqueeze(1)
-               
             ]
+            
             
             # Concatenate along the feature dimension
             robot_obs = torch.cat(obs_list, dim=-1)
-            
             observations[robot_name] = robot_obs
     
         return observations
     
 
-    def _apply_action(self):
+    # def _apply_action(self):
 
         
         
         
         
-        self.robot_1_curr_targets[:, self.actuated_dof_indices] = scale(
-            self.actions["robot_1"],
-            self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-            self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = scale(
+    #         self.actions["robot_1"],
+    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
+    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     )
+    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+    #         self.cfg.act_moving_average * self.robot_1_curr_targets[:, self.actuated_dof_indices]
+    #         + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets[:, self.actuated_dof_indices]
+    #     )
+
+        
+    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
+    #         self.robot_1_curr_targets[:, self.actuated_dof_indices],
+    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
+    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     )
+
+        
+    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = scale(
+    #         self.actions["robot_2"],
+    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
+    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     )
+    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
+    #         self.cfg.act_moving_average * self.robot_2_curr_targets[:, self.actuated_dof_indices]
+    #         + (1.0 - self.cfg.act_moving_average) * self.robot_2_prev_targets[:, self.actuated_dof_indices]
+    #     )
+    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
+    #         self.robot_2_curr_targets[:, self.actuated_dof_indices],
+    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
+    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     )
+
+        
+
+    #     self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[
+    #         :, self.actuated_dof_indices
+    #     ]
+    #     self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[
+    #         :, self.actuated_dof_indices
+    #     ]
+    #     # self.robot_1.set_joint_position_target(
+    #     #     self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
+    #     # )
+
+    #     # self.count+=1
+       
+    #     # if self.count > 200:
+    #     #     print("increasing count")
+    #     #     self.robot_1_curr_targets[:, 2] += 0.16
+            
+            
+    #     # if self.count > 500:
+    #     #     print("beinding")
+    #     #     self.robot_1_curr_targets[:, 4] += -50
+        
+    #     self.robot_1.set_joint_position_target(
+    #         # 0. - Swings the arm side to side (base yaw) - X position of ee
+    #         # 1. - Moves the arm up/down (pitch motion) - Y axis moving ee
+    #         # 2. Length
+    #         # 3. Rolls instrument around tool shaft
+    #         # 4. Bends the tip up/down
+    #         # 5. Turns the tip side to side
+    #         # 6. gripper 
+    #         # 7. Gripper length
+    #         self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices,
+    #     )
+        
+    #     # self.robot_2.set_joint_position_target(
+    #     #     self.robot_2_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
+    #     # )
+        
+    def _apply_action(self):
+        """
+        Modified to use relative/delta actions instead of absolute positions
+        """
+        
+        # RELATIVE ACTIONS - Key changes here
+        # Actions now represent deltas/changes rather than absolute targets
+        
+        # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
+        action_scale = 0.5  # Adjust based on your robot's characteristics
+        
+        # Robot 1 - Apply relative changes
+        # Scale actions from [-1, 1] to [-action_scale, action_scale]
+        action_deltas_1 = self.actions["robot_1"] * action_scale
+        
+        # Update targets by adding deltas to CURRENT positions (not previous targets)
+        current_joint_pos = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
+        self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+            current_joint_pos + action_deltas_1
         )
+        
+        # Apply moving average for smoothing
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
             self.cfg.act_moving_average * self.robot_1_curr_targets[:, self.actuated_dof_indices]
             + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets[:, self.actuated_dof_indices]
         )
-
         
+        # Clamp to joint limits
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
             self.robot_1_curr_targets[:, self.actuated_dof_indices],
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
-
         
-        self.robot_2_curr_targets[:, self.actuated_dof_indices] = scale(
-            self.actions["robot_2"],
-            self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-            self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+        # Robot 2 - Same approach
+        action_deltas_2 = self.actions["robot_2"] * action_scale
+        
+        current_joint_pos_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
+        self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
+            current_joint_pos_2 + action_deltas_2
         )
+        
         self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
             self.cfg.act_moving_average * self.robot_2_curr_targets[:, self.actuated_dof_indices]
             + (1.0 - self.cfg.act_moving_average) * self.robot_2_prev_targets[:, self.actuated_dof_indices]
         )
+        
         self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
             self.robot_2_curr_targets[:, self.actuated_dof_indices],
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
-
         
-
-        self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[
-            :, self.actuated_dof_indices
-        ]
-        self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[
-            :, self.actuated_dof_indices
-        ]
-        # self.robot_1.set_joint_position_target(
-        #     self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
-        # )
-
-        # self.count+=1
-       
-        # if self.count > 200:
-        #     print("increasing count")
-        #     self.robot_1_curr_targets[:, 2] += 0.16
-            
-            
-        # if self.count > 500:
-        #     print("beinding")
-        #     self.robot_1_curr_targets[:, 4] += -50
+        # Store previous targets for next iteration
+        self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
+        self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
         
+        # Apply the targets
         self.robot_1.set_joint_position_target(
-            # 0. - Swings the arm side to side (base yaw) - X position of ee
-            # 1. - Moves the arm up/down (pitch motion) - Y axis moving ee
-            # 2. Length
-            # 3. Rolls instrument around tool shaft
-            # 4. Bends the tip up/down
-            # 5. Turns the tip side to side
-            # 6. gripper 
-            # 7. Gripper length
-            self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices,
+            self.robot_1_curr_targets[:, self.actuated_dof_indices], 
+            joint_ids=self.actuated_dof_indices,
         )
         
+        # Uncomment when ready to control robot_2
         # self.robot_2.set_joint_position_target(
-        #     self.robot_2_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
+        #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
+        #     joint_ids=self.actuated_dof_indices
         # )
-        
-    
+
     
     def _get_states(self):
         
@@ -249,11 +352,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
     def _get_phase(self):
         
+        obj_pos = self._get_obj_pos()
         self.current_phases, phase_indices, phase_regressed_mask, phase_same_mask = self.phase_detector.get_phases(
             agents=[self.robot_1, self.robot_2],
             obj_position=self._get_obj_pos(),
             batch_size=self.num_envs,
-            goal_position=self.goal_pos,
+            goal_position=self.get_goal_pos(obj_pos),
             prev_phases = self.current_phases.clone()
         )
         self.phase_regressed_mask = phase_regressed_mask
@@ -263,10 +367,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #return self.object.data.root_pos_w - self.scene.env_origin
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] += 0.01
+        pos_new[:, 2] += 0.005
+        pos_new[:, 0] +=0.01
+        #pos_new[:, 1] += 0.01
         return  pos_new
     
-    def get_p1_pos(self, obj_position, approach_angle=35):
+    def get_p1_pos(self, obj_position, approach_angle=35): 
         """
         Create P1 at 45-degree approach angle
         """
@@ -281,6 +387,24 @@ class DualArmHandoverEnv(DirectMARLEnv):
         p1_pos[:, 2] += approach_distance * torch.sin(angle_rad)  # Z offset (height)
         
         return p1_pos
+    
+
+    def get_goal_pos(self, obj_position, approach_angle=-215): 
+        """
+        Create P1 at 45-degree approach angle
+        """
+        angle_rad = torch.deg2rad(torch.tensor(approach_angle))
+        
+        # Distance from object (adjust this based on your needs)
+        approach_distance = 0.03  # 5cm approach distance
+        
+        # Calculate P1 position at 45-degree angle
+        p1_pos = obj_position.clone()
+        p1_pos[:, 0] += approach_distance * torch.cos(angle_rad)  # X offset
+        p1_pos[:, 2] += approach_distance * torch.sin(angle_rad)  # Z offset (height)
+        
+        return p1_pos
+    
     
     def _get_r2_stationary_rew(self, env_id):
         ee_position_2 = self._get_ee_position(self.robot_2)[env_id]
@@ -316,7 +440,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         ee_1 = self._get_ee_position(self.robot_1)
         ee_2 = self._get_ee_position(self.robot_2)
         p1_pos = self.get_p1_pos(obj_pos)
-        goal_pos = self.goal_pos
+        goal_pos = self.get_goal_pos(obj_pos)
         log_if(not self.cfg.is_training, "phase_regressed_mask", phase_regressed_mask)
         rewards = torch.zeros((num_envs, num_phases), device=device)
 
@@ -344,6 +468,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         # phase 1: GRIP_1_OPEN
         gripper_width = self.phase_detector.get_gripper_width(self.robot_1)
+        log_if(not self.cfg.is_training, "gripper width", gripper_width)
         #rewards[:, Phases.GRIP_1_OPEN.value] = self.cfg.dist_reward_scale * gripper_width * self.cfg.reward_scale
         
 
@@ -370,12 +495,23 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         # phase 3: LIFT
         height = obj_pos[:, 2] - self.cfg.ground_height
-        rewards[:, Phases.LIFT.value] += 10 * height
-        
+        rewards[:, Phases.LIFT.value] += 100*height
+
+        log_if(not self.cfg.is_training, f" obj_pos z {obj_pos[:, 2]} height {height}")
 
         # phase 4: REACH_GOAL_1
+        mask_reach1 = self.phase_detector.is_object_above_ground(obj_pos) & (
+                        self.not_visited_mask[env_ids, Phases.LIFT.value] 
+                            & ~self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value]) & (
+                                phases_one_hot[env_ids, Phases.REACH_GOAL_1.value].bool()
+                            )
+
+        
+        self.not_visited_mask[mask_reach1, Phases.LIFT.value] = False
+        rewards[mask_reach1, Phases.REACH_GOAL_1.value] += 2000
+
         dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
-        rewards[:, Phases.REACH_GOAL_1.value] = torch.exp(-self.cfg.dist_reward_scale * dist_goal1)
+        rewards[:, Phases.REACH_GOAL_1.value] = 2 * torch.exp(-50 * dist_goal1)
 
         # phase 5: REACH_GOAL_2
         dist_goal2 = torch.norm(goal_pos - ee_2, dim=-1)
@@ -439,7 +575,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
             {agent: timeout.clone() for agent in self.cfg.possible_agents}
         )
 
-
+    
 
     def _reset_idx(self, env_ids):
         
@@ -452,9 +588,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.phase_visit_counts = torch.zeros((self.num_envs, len(Phases)), device=self.device, dtype=torch.float)
 
         # Reset object pose with some noise
-        pos_noise = self.cfg.reset_position_noise * sample_uniform(-1, 1, (len(env_ids), 3), self.device)
+
+        x_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
+        y_noise = sample_uniform(-0.05, 0.05, (len(env_ids), 1), self.device)
+        z_noise = sample_uniform(0, 0.01, (len(env_ids), 1), self.device)
+
+        pos_noise = torch.cat([x_noise, y_noise, z_noise], dim=1)
         rot_noise = self.cfg.reset_rot_noise * sample_uniform(-1, 1, (len(env_ids), 2), self.device)
+        
         new_pos = self.scene.env_origins[env_ids] + pos_noise
+        
         new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
         # new_rot[0] = torch.tensor([0.5, 0.5, 0.5, 0.5])
         self.current_phases[:, Phases.REACH_P1.value] = 1.0

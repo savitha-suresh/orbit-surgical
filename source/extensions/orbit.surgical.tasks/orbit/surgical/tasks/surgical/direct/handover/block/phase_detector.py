@@ -81,7 +81,7 @@ class PhaseDetector:
         # Get gripper joint positions
         gripper_pos = self.get_gripper_pos(robot)
         # Gripper is closed if both joints are close to closed position
-        closed_threshold = 0.05  # Adjust based on your gripper
+        closed_threshold = 0.01  # Adjust based on your gripper
         is_closed = torch.all(torch.abs(gripper_pos) < closed_threshold, dim=-1)
         
         return is_closed
@@ -138,7 +138,7 @@ class PhaseDetector:
         phase_mask = torch.zeros((num_envs, num_phases), dtype=torch.bool, device=device)
         # PHASE 0: REACH_OBJ
         
-        log_if(not self.cfg.is_training, f"ee_p1 {ee1_p1_dist} obj to ee {ee1_obj_dist}")
+        log_if(not self.cfg.is_training, f"ee_p1 {ee1_p1_dist} obj to ee {ee1_obj_dist} goal to ee_dist {ee1_goal_dist}")
         phase_mask[:, Phases.REACH_P1.value] = (
             (ee1_p1_dist > self.CLOSE_THRESHOLD) 
         )
@@ -163,19 +163,19 @@ class PhaseDetector:
         # )
 
         # # PHASE 2: GRIP_1_CLOSE
-        phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
-            (ee1_obj_dist <= self.GRIP_THRESHOLD) &
-            (~obj_above_ground) &
-            (~gripper_1_closed) & 
-            ~self.env.not_visited_mask[:, Phases.REACH_P1.value]
-        )
+        # phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
+        #     (ee1_obj_dist <= self.GRIP_THRESHOLD) &
+        #     (~obj_above_ground) &
+        #     (~gripper_1_closed) & 
+        #     ~self.env.not_visited_mask[:, Phases.REACH_P1.value]
+        # )
 
-        # # PHASE 3: LIFT
-        phase_mask[:, Phases.LIFT.value] = (
-            (ee1_obj_dist <= self.GRIP_THRESHOLD) &
-            (~obj_above_ground) &
-            gripper_1_closed & ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value]
-        )
+        # # # PHASE 3: LIFT
+        # phase_mask[:, Phases.LIFT.value] = (
+        #     (ee1_obj_dist <= self.GRIP_THRESHOLD) &
+        #     (~obj_above_ground) &
+        #     gripper_1_closed & ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value]
+        # )
 
         # # PHASE 4: REACH_GOAL_1
         # phase_mask[:, Phases.REACH_GOAL_1.value] = (
