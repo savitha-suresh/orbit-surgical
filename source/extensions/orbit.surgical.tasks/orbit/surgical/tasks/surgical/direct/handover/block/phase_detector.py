@@ -178,7 +178,7 @@ class PhaseDetector:
             (
                 (
                     (gripper_width >= 0.8) &
-                    (prev_phases[:, Phases.GRIP_1_OPEN.value])
+                    (prev_phases[:, Phases.GRIP_1_OPEN.value] | ~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN.value])
                 ) |
                 (
                     (gripper_width >= 0.01) &

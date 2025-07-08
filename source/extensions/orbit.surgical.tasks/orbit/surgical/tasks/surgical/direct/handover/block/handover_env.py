@@ -490,7 +490,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.not_visited_mask[mask_open, Phases.GRIP_1_OPEN.value] = False
         rewards[mask_open, Phases.GRIP_1_CLOSE.value] += 2000
         # phase 2: GRIP_1_CLOSE
-        rewards[:, Phases.GRIP_1_CLOSE.value] += 2* torch.exp(-5 * gripper_width)
+        rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
 
 
         mask_close = self.phase_detector.is_gripper_closed(self.robot_1) & (
