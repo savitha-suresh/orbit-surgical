@@ -367,7 +367,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #return self.object.data.root_pos_w - self.scene.env_origin
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] += 0.005
+        pos_new[:, 2] += 0.01
         pos_new[:, 0] +=0.01
         #pos_new[:, 1] += 0.01
         return  pos_new
@@ -469,18 +469,28 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # phase 1: GRIP_1_OPEN
         gripper_width = self.phase_detector.get_gripper_width(self.robot_1)
         log_if(not self.cfg.is_training, "gripper width", gripper_width)
-        #rewards[:, Phases.GRIP_1_OPEN.value] = self.cfg.dist_reward_scale * gripper_width * self.cfg.reward_scale
+        #
         
 
         mask_ro = (dist_obj_ee <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & (
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ.value] & 
-                    (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE.value].bool()))
+                    (phases_one_hot[env_ids, Phases.GRIP_1_OPEN.value].bool()))
 
         
         self.not_visited_mask[mask_ro, Phases.REACH_OBJ.value] = False
-        rewards[mask_ro, Phases.GRIP_1_CLOSE.value] += 2000
+        rewards[mask_ro, Phases.GRIP_1_OPEN.value] += 2000
+        rewards[:, Phases.GRIP_1_OPEN.value] +=  gripper_width * 20
+
+        mask_open = (dist_obj_ee <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & (
+                    ~self.phase_detector.is_gripper_closed(self.robot_1) & 
+                    self.not_visited_mask[env_ids, Phases.GRIP_1_OPEN.value] & 
+                    (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE.value].bool()))
+
+        
+        self.not_visited_mask[mask_open, Phases.GRIP_1_OPEN.value] = False
+        rewards[mask_open, Phases.GRIP_1_CLOSE.value] += 2000
         # phase 2: GRIP_1_CLOSE
-        rewards[:, Phases.GRIP_1_CLOSE.value] += 2* torch.exp(-50 * gripper_width)
+        rewards[:, Phases.GRIP_1_CLOSE.value] += 2* torch.exp(-5 * gripper_width)
 
 
         mask_close = self.phase_detector.is_gripper_closed(self.robot_1) & (
@@ -497,7 +507,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         height = obj_pos[:, 2] - self.cfg.ground_height
         rewards[:, Phases.LIFT.value] += 100*height
 
-        log_if(not self.cfg.is_training, f" obj_pos z {obj_pos[:, 2]} height {height}")
+        log_if(not self.cfg.is_training, f"obj_pos z {obj_pos[:, 2]} height {height}")
 
         # phase 4: REACH_GOAL_1
         mask_reach1 = self.phase_detector.is_object_above_ground(obj_pos) & (
@@ -539,10 +549,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         final_rewards_r1[phase_regressed_mask] += self.cfg.phase_regressed_penalty
         
         final_rewards_r2 = torch.zeros((self.num_envs,), dtype=torch.float, device=self.robot_1.data.device)
-        
-        
         log_if(not self.cfg.is_training, "visited", self.not_visited_mask)
-        log_if(not self.cfg.is_training, f"rewards {final_rewards_r1} rewards_all {rewards}, phases one {phases_one_hot}")
+        log_if(not self.cfg.is_training, f"rewards {final_rewards_r1} rewards_all {rewards}")
         
         return {
             "robot_1": final_rewards_r1,
