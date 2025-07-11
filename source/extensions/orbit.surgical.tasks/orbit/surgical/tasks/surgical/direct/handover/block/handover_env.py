@@ -197,7 +197,6 @@ class DualArmHandoverEnv(DirectMARLEnv):
             
             # Concatenate along the feature dimension
             robot_obs = torch.cat(obs_list, dim=-1)
-            
             observations[robot_name] = robot_obs
     
         return observations
