@@ -233,7 +233,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     dist_reward_scale = 20.0
     dist_reward_scale_reach_obj = 25
     reward_scale = 10
-    act_moving_average = 1
+    act_moving_average = 0.8
     phase_regressed_penalty = 0
     phase_same_penalty = 0
 

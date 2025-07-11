@@ -296,8 +296,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         # Apply moving average for smoothing
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
-            self.cfg.act_moving_average * self.robot_1_curr_targets[:, self.actuated_dof_indices]
-            + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets[:, self.actuated_dof_indices]
+            self.cfg.act_moving_average * self.robot_1_prev_targets[:, self.actuated_dof_indices]
+            + (1.0 - self.cfg.act_moving_average) * self.robot_1_curr_targets[:, self.actuated_dof_indices]
         )
         
         # Clamp to joint limits
@@ -316,8 +316,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         )
         
         self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
-            self.cfg.act_moving_average * self.robot_2_curr_targets[:, self.actuated_dof_indices]
-            + (1.0 - self.cfg.act_moving_average) * self.robot_2_prev_targets[:, self.actuated_dof_indices]
+            self.cfg.act_moving_average * self.robot_2_prev_targets[:, self.actuated_dof_indices]
+            + (1.0 - self.cfg.act_moving_average) * self.robot_2_curr_targets[:, self.actuated_dof_indices]
         )
         
         self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
