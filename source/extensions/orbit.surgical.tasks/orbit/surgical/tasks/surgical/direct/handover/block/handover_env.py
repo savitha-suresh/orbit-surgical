@@ -546,7 +546,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
 
 
-        mask_close = gripper_width < 0.1 & (
+        mask_close = (gripper_width < 0.1) & (
                         self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value] 
                             & ~self.not_visited_mask[env_ids, Phases.REACH_OBJ.value]) & (
                                 phases_one_hot[env_ids, Phases.LIFT.value].bool()
