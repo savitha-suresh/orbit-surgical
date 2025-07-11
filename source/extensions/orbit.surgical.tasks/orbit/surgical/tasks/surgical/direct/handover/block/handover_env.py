@@ -167,7 +167,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
             p1_pos = self.get_p1_pos(obj_pos)
             ee_to_p1 = p1_pos - ee_pose[:, :3]
             ee_to_p1_dir = ee_to_p1 / (torch.norm(ee_to_p1, dim=-1, keepdim=True) + 1e-8)
-            
+
+
+            grip_pos = self.get_obj_grip_pos()
+            ee_to_grip = grip_pos - ee_pose[:, :3]
+            ee_to_grip_dir = ee_to_grip / (torch.norm(ee_to_grip, dim=-1, keepdim=True) + 1e-8)
+            ee_to_grip_distance = torch.norm(ee_to_grip, dim=-1, keepdim=True)
             # Concatenate RELATIVE observations
             obs_list = [
                 joint_pos_rel,                    # Joint positions (already relative)
@@ -176,12 +181,15 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 ee_to_goal,                       # Vector from EE to goal
                 obj_to_goal,                      # Vector from object to goal
                 ee_to_p1,                         # Vector from EE to waypoint
+                ee_to_grip, 
                 ee_to_obj_distance,               # Distance to object
                 ee_to_goal_distance,              # Distance to goal
+                ee_to_grip_distance, 
                 ee_to_obj_dir,                    # Direction to object (normalized)
                 ee_to_goal_dir,                   # Direction to goal (normalized)
                 obj_to_goal_dir,                  # Direction object should move
                 ee_to_p1_dir,                     # Direction to waypoint
+                ee_to_grip_dir,
                 self.not_visited_mask,            # Task phase info
                 self.phase_regressed_mask.unsqueeze(1)
             ]
