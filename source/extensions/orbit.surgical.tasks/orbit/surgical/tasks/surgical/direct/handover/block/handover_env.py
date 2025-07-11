@@ -546,7 +546,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
 
 
-        mask_close = self.phase_detector.is_gripper_closed(self.robot_1) & (
+        mask_close = gripper_width < 0.1 & (
                         self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value] 
                             & ~self.not_visited_mask[env_ids, Phases.REACH_OBJ.value]) & (
                                 phases_one_hot[env_ids, Phases.LIFT.value].bool()
@@ -560,7 +560,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         height = obj_pos[:, 2] - self.cfg.ground_height
         rewards[:, Phases.LIFT.value] += torch.where(
                             self.not_visited_mask[:, Phases.LIFT.value],
-                            10*height ,
+                            20*height ,
                             rewards[:, Phases.LIFT.value] )
         #rewards[:, Phases.LIFT.value] += 10*height
 
