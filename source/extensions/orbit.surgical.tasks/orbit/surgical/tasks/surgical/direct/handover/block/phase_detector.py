@@ -185,7 +185,7 @@ class PhaseDetector:
                 (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) |
                 (
                     (ee1_obj_grip_dist > self.GRIP_THRESHOLD) &
-                    (ee1_obj_grip_dist <= 0.02) &
+                    (ee1_obj_grip_dist <= 0.04) &
                     (prev_phases[:, Phases.GRIP_1_CLOSE.value])
                 )
             ) &

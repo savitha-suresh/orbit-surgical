@@ -224,7 +224,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
             )
 
     # Constants for logic (used in reward, reset, etc.)
-    ee_link_name: str = "psm_tool_gripper1_link"
+    ee_link_name: str = "psm_tool_tip_link"
     reset_position_noise = 0.01
     reset_rot_noise = 0.1
     reset_dof_pos_noise = 0.2  # range of dof pos at reset
