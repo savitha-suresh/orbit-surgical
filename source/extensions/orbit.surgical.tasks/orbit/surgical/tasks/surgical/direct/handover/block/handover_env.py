@@ -62,7 +62,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.goal_markers = VisualizationMarkers(self.cfg.p1_pos_cfg)
         self.goal_markers_obj = VisualizationMarkers(self.cfg.obj_pos_cfg)
         self.markers_goal = VisualizationMarkers(self.cfg.goal_pos_cfg)
-        self.ee_marker = VisualizationMarkers(self.cfg.ee_pos_cfg)
+        self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
+        self.grip_tgt_marker = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg)
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
         self.hand_dof_upper_limits = joint_pos_limits[..., 1]
@@ -93,7 +94,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.goal_markers.visualize(p1_pos)
         goal_pos = self.get_goal_pos(obj_pos)
         self.markers_goal.visualize(goal_pos)
-        self.ee_marker.visualize(self._get_ee_position(self.robot_1))
+        self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
+        self.grip_tgt_marker.visualize(self.get_gripper_link_target_pos())
+
         
 
     def _compute_intermediate_values(self):
@@ -401,7 +404,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_grip_pos(self):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] += 0.005
+        pos_new[:, 2] += 0.001
         pos_new[:, 0] +=0.01
         return  pos_new
     
@@ -574,7 +577,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         rewards[:, Phases.GRIP_1_CLOSE.value] += torch.where(
                             self.not_visited_mask[:, Phases.GRIP_1_CLOSE.value],
-                            20 * torch.exp(-10 * gripper_width) ,
+                            200 * torch.exp(-10 * gripper_width) ,
                             rewards[:, Phases.GRIP_1_CLOSE.value] )
         #rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
 
@@ -593,7 +596,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         height = obj_pos[:, 2] - self.cfg.ground_height
         rewards[:, Phases.LIFT.value] += torch.where(
                             self.not_visited_mask[:, Phases.LIFT.value],
-                            20*height ,
+                            200*height ,
                             rewards[:, Phases.LIFT.value] )
         #rewards[:, Phases.LIFT.value] += 10*height
 
