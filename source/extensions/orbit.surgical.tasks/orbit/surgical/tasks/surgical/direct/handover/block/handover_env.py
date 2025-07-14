@@ -289,7 +289,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # Actions now represent deltas/changes rather than absolute targets
         
         # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
-        action_scale = 0.5  # Adjust based on your robot's characteristics
+        action_scale = 0.2  # Adjust based on your robot's characteristics
         
         # Robot 1 - Apply relative changes
         # Scale actions from [-1, 1] to [-action_scale, action_scale]
