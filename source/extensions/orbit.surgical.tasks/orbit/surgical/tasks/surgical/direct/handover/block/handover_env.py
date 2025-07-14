@@ -280,44 +280,133 @@ class DualArmHandoverEnv(DirectMARLEnv):
     #     #     self.robot_2_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
     #     # )
         
+    # def _apply_action(self):
+    #     """
+    #     Modified to use relative/delta actions instead of absolute positions
+    #     """
+        
+    #     # RELATIVE ACTIONS - Key changes here
+    #     # Actions now represent deltas/changes rather than absolute targets
+        
+    #     # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
+    #     action_scale = 0.2  # Adjust based on your robot's characteristics
+        
+    #     # Robot 1 - Apply relative changes
+    #     # Scale actions from [-1, 1] to [-action_scale, action_scale]
+    #     action_deltas_1 = self.actions["robot_1"] * action_scale
+        
+    #     # Update targets by adding deltas to CURRENT positions (not previous targets)
+    #     current_joint_pos = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
+    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+    #         current_joint_pos + action_deltas_1
+    #     )
+        
+    #     # Apply moving average for smoothing
+    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+    #         self.cfg.act_moving_average * self.robot_1_prev_targets[:, self.actuated_dof_indices]
+    #         + (1.0 - self.cfg.act_moving_average) * self.robot_1_curr_targets[:, self.actuated_dof_indices]
+    #     )
+        
+    #     # Clamp to joint limits
+    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
+    #         self.robot_1_curr_targets[:, self.actuated_dof_indices],
+    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
+    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     )
+        
+    #     # Robot 2 - Same approach
+    #     action_deltas_2 = self.actions["robot_2"] * action_scale
+        
+    #     current_joint_pos_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
+    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
+    #         current_joint_pos_2 + action_deltas_2
+    #     )
+        
+    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
+    #         self.cfg.act_moving_average * self.robot_2_prev_targets[:, self.actuated_dof_indices]
+    #         + (1.0 - self.cfg.act_moving_average) * self.robot_2_curr_targets[:, self.actuated_dof_indices]
+    #     )
+        
+    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
+    #         self.robot_2_curr_targets[:, self.actuated_dof_indices],
+    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
+    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
+    #     )
+        
+    #     # Store previous targets for next iteration
+    #     self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
+    #     self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
+        
+    #     # Apply the targets
+    #     self.robot_1.set_joint_position_target(
+    #         self.robot_1_curr_targets[:, self.actuated_dof_indices], 
+    #         joint_ids=self.actuated_dof_indices,
+    #     )
+        
+    #     # Uncomment when ready to control robot_2
+    #     # self.robot_2.set_joint_position_target(
+    #     #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
+    #     #     joint_ids=self.actuated_dof_indices
+    #     # )
+
+
     def _apply_action(self):
         """
-        Modified to use relative/delta actions instead of absolute positions
+        Modified to use impedance control instead of position control
         """
+        # IMPEDANCE CONTROL PARAMETERS
+        # These should be tuned based on your robot and task requirements
+        kp = 1000.0  # Proportional gain (stiffness) - adjust based on desired stiffness
+        kd = 100.0   # Derivative gain (damping) - adjust based on desired damping
+        action_scale = 0.2  # Scale for relative actions
         
-        # RELATIVE ACTIONS - Key changes here
-        # Actions now represent deltas/changes rather than absolute targets
-        
-        # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
-        action_scale = 0.2  # Adjust based on your robot's characteristics
-        
-        # Robot 1 - Apply relative changes
+        # Robot 1 - Impedance Control
         # Scale actions from [-1, 1] to [-action_scale, action_scale]
         action_deltas_1 = self.actions["robot_1"] * action_scale
         
-        # Update targets by adding deltas to CURRENT positions (not previous targets)
+        # Get current joint positions and velocities
         current_joint_pos = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
+        current_joint_vel = self.robot_1.data.joint_vel[:, self.actuated_dof_indices]
+        
+        # Update desired positions by adding deltas to current positions
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
             current_joint_pos + action_deltas_1
         )
         
-        # Apply moving average for smoothing
+        # Apply moving average for smoothing desired positions
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
             self.cfg.act_moving_average * self.robot_1_prev_targets[:, self.actuated_dof_indices]
             + (1.0 - self.cfg.act_moving_average) * self.robot_1_curr_targets[:, self.actuated_dof_indices]
         )
         
-        # Clamp to joint limits
+        # Clamp desired positions to joint limits
         self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
             self.robot_1_curr_targets[:, self.actuated_dof_indices],
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
         
+        # IMPEDANCE CONTROL CALCULATION
+        # Calculate position error
+        pos_error = (self.robot_1_curr_targets[:, self.actuated_dof_indices] - 
+                    current_joint_pos)
+        
+        # Calculate velocity error (assuming desired velocity is 0 for position holding)
+        # You can modify this to include desired velocities if needed
+        vel_error = -current_joint_vel  # Desired velocity is 0
+        
+        # Calculate impedance control torques
+        # τ = Kp * (q_desired - q_actual) + Kd * (q̇_desired - q̇_actual)
+        control_torques_1 = kp * pos_error + kd * vel_error
+        
+        # Optional: Add feedforward terms or gravity compensation
+        # control_torques_1 += self.robot_1.data.gravity_force[:, self.actuated_dof_indices]
+        
         # Robot 2 - Same approach
         action_deltas_2 = self.actions["robot_2"] * action_scale
-        
         current_joint_pos_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
+        current_joint_vel_2 = self.robot_2.data.joint_vel[:, self.actuated_dof_indices]
+        
         self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
             current_joint_pos_2 + action_deltas_2
         )
@@ -333,23 +422,29 @@ class DualArmHandoverEnv(DirectMARLEnv):
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
         
+        # Impedance control for robot 2
+        pos_error_2 = (self.robot_2_curr_targets[:, self.actuated_dof_indices] - 
+                        current_joint_pos_2)
+        vel_error_2 = -current_joint_vel_2
+        control_torques_2 = kp * pos_error_2 + kd * vel_error_2
+        
         # Store previous targets for next iteration
         self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
         self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
         
-        # Apply the targets
-        self.robot_1.set_joint_position_target(
-            self.robot_1_curr_targets[:, self.actuated_dof_indices], 
+        # Apply impedance control torques instead of position targets
+        self.robot_1.set_joint_effort_target(
+            control_torques_1,
             joint_ids=self.actuated_dof_indices,
         )
         
         # Uncomment when ready to control robot_2
-        # self.robot_2.set_joint_position_target(
-        #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
+        # self.robot_2.set_joint_effort_target(
+        #     control_torques_2,
         #     joint_ids=self.actuated_dof_indices
         # )
 
-    
+
     def _get_states(self):
         
         # same as observation but both agents in one vector
@@ -691,6 +786,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.robot_2_curr_targets = torch.zeros(
             (self.num_envs, self.num_hand_dofs), dtype=torch.float, device=self.device
         )
+        self.robot_1_prev_deltas = torch.zeros_like(self.robot_1.data.joint_pos[:, self.actuated_dof_indices])
+        self.robot_2_prev_deltas = torch.zeros_like(self.robot_2.data.joint_pos[:, self.actuated_dof_indices])
+
         
         
         self.object.write_root_pose_to_sim(torch.cat((new_pos, new_rot), dim=-1), env_ids)
