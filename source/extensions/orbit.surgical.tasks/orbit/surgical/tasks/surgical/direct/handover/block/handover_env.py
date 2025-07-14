@@ -543,7 +543,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         rewards[:, Phases.GRIP_1_CLOSE.value] += torch.where(
                             self.not_visited_mask[:, Phases.GRIP_1_CLOSE.value],
-                            200 * torch.exp(-5 * gripper_width) ,
+                            20 * torch.exp(-10 * gripper_width) ,
                             rewards[:, Phases.GRIP_1_CLOSE.value] )
         #rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
 
