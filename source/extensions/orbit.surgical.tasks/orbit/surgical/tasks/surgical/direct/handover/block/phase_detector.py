@@ -117,6 +117,9 @@ class PhaseDetector:
         obj_grip_pos = self.env.get_obj_grip_pos()
         ee_1_pos = self._get_ee_position(robot_1)         # (num_envs, 3)
         ee_2_pos = self._get_ee_position(robot_2)         # (num_envs, 3)
+
+        grip_lnk_pos = self.env.get_gripper_link_pos(robot_1)
+        grip_lnk_tgt_pos = self.env.get_gripper_link_target_pos()
         prev_phases = prev_phases.bool()
         #print("prev_phases", prev_phases)
         gripper_1_closed = self.is_gripper_closed(robot_1)  # (num_envs,)
@@ -131,7 +134,8 @@ class PhaseDetector:
         ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
         ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
         ee1_obj_grip_dist = self._get_distance(ee_1_pos, obj_grip_pos)
-        
+        grip_link_tgt_dist = self._get_distance(grip_lnk_pos, grip_lnk_tgt_pos)
+        log_if(not self.cfg.is_training, f"gripper_link_to tgt {grip_link_tgt_dist}")
         num_envs = batch_size
         num_phases = len(Phases)
         device = ee_1_pos.device
@@ -176,7 +180,9 @@ class PhaseDetector:
                 gripper_width < 0.8) & (gripper_width > 0.5) & prev_phases[:, Phases.REACH_OBJ_GRIP.value]) &
             (~obj_above_ground) &
             ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value] & 
-            (ee1_obj_grip_dist > self.GRIP_CLOSE_THRESHOLD)
+            (ee1_obj_grip_dist > self.GRIP_CLOSE_THRESHOLD) & 
+            (grip_link_tgt_dist > self.GRIP_CLOSE_THRESHOLD)
+
         )
 
         # PHASE 2: GRIP_1_CLOSE
@@ -185,6 +191,12 @@ class PhaseDetector:
                 (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) | (
                     (ee1_obj_grip_dist > self.GRIP_THRESHOLD) &
                     (ee1_obj_grip_dist <= 0.02) &
+                    (prev_phases[:, Phases.GRIP_1_CLOSE.value])
+                )
+            ) & (
+                (grip_link_tgt_dist <= self.GRIP_THRESHOLD) | (
+                    (grip_link_tgt_dist > self.GRIP_THRESHOLD) &
+                    (grip_link_tgt_dist <= 0.02) &
                     (prev_phases[:, Phases.GRIP_1_CLOSE.value])
                 )
             ) &

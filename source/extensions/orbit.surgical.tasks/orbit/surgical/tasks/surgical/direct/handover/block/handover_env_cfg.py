@@ -154,8 +154,8 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     possible_agents = ["robot_1", "robot_2"]
     # action - 7, obs - 33 in the manager
     action_spaces = {"robot_1": 8, "robot_2": 8}  # IK target delta pose
-    observation_spaces = {"robot_1": 61, "robot_2": 61}  # example dim (can be tuned)
-    state_space = 122  # combined
+    observation_spaces = {"robot_1": 68, "robot_2": 68}  # example dim (can be tuned)
+    state_space = 136 # combined
     ground_height=0.0149
     events: EventCfg = EventCfg()
     commands: CommandsCfg = CommandsCfg()
@@ -222,9 +222,20 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
                     ),
                 },
             )
+    
+    ee_pos_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.003,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+                    ),
+                },
+            )
 
     # Constants for logic (used in reward, reset, etc.)
     ee_link_name: str = "psm_tool_tip_link"
+    gripper_name: str = "psm_tool_gripper1_link"
     reset_position_noise = 0.01
     reset_rot_noise = 0.1
     reset_dof_pos_noise = 0.2  # range of dof pos at reset
