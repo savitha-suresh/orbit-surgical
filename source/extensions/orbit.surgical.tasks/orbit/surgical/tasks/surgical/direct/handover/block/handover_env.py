@@ -280,155 +280,77 @@ class DualArmHandoverEnv(DirectMARLEnv):
     #     #     self.robot_2_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
     #     # )
         
-    # def _apply_action(self):
-    #     """
-    #     Modified to use relative/delta actions instead of absolute positions
-    #     """
-        
-    #     # RELATIVE ACTIONS - Key changes here
-    #     # Actions now represent deltas/changes rather than absolute targets
-        
-    #     # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
-    #     action_scale = 0.2  # Adjust based on your robot's characteristics
-        
-    #     # Robot 1 - Apply relative changes
-    #     # Scale actions from [-1, 1] to [-action_scale, action_scale]
-    #     action_deltas_1 = self.actions["robot_1"] * action_scale
-        
-    #     # Update targets by adding deltas to CURRENT positions (not previous targets)
-    #     current_joint_pos = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
-    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
-    #         current_joint_pos + action_deltas_1
-    #     )
-        
-    #     # Apply moving average for smoothing
-    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
-    #         self.cfg.act_moving_average * self.robot_1_prev_targets[:, self.actuated_dof_indices]
-    #         + (1.0 - self.cfg.act_moving_average) * self.robot_1_curr_targets[:, self.actuated_dof_indices]
-    #     )
-        
-    #     # Clamp to joint limits
-    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
-    #         self.robot_1_curr_targets[:, self.actuated_dof_indices],
-    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
-    #     )
-        
-    #     # Robot 2 - Same approach
-    #     action_deltas_2 = self.actions["robot_2"] * action_scale
-        
-    #     current_joint_pos_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
-    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
-    #         current_joint_pos_2 + action_deltas_2
-    #     )
-        
-    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
-    #         self.cfg.act_moving_average * self.robot_2_prev_targets[:, self.actuated_dof_indices]
-    #         + (1.0 - self.cfg.act_moving_average) * self.robot_2_curr_targets[:, self.actuated_dof_indices]
-    #     )
-        
-    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
-    #         self.robot_2_curr_targets[:, self.actuated_dof_indices],
-    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
-    #     )
-        
-    #     # Store previous targets for next iteration
-    #     self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
-    #     self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
-        
-    #     # Apply the targets
-    #     self.robot_1.set_joint_position_target(
-    #         self.robot_1_curr_targets[:, self.actuated_dof_indices], 
-    #         joint_ids=self.actuated_dof_indices,
-    #     )
-        
-    #     # Uncomment when ready to control robot_2
-    #     # self.robot_2.set_joint_position_target(
-    #     #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
-    #     #     joint_ids=self.actuated_dof_indices
-    #     # )
-
-
     def _apply_action(self):
-        alpha = 0.9  # Smoothing factor
-        action_scale = 0.2  # Scale for delta joint actions
-        max_torque = 50.0  # Max torque limit per joint
-
-        # Per-joint gains (adjust based on DOF)
-        kp = torch.tensor([1000.0, 1000.0, 800.0, 800.0, 600.0, 600.0, 400.0, 400.0], device=self.device).unsqueeze(0)
-        kd = torch.tensor([100.0, 100.0, 80.0, 80.0, 60.0, 60.0, 40.0, 40.0], device=self.device).unsqueeze(0)
-
-
-        # ---------------------------
-        # Robot 1
-        # ---------------------------
+        """
+        Modified to use relative/delta actions instead of absolute positions
+        """
+        
+        # RELATIVE ACTIONS - Key changes here
+        # Actions now represent deltas/changes rather than absolute targets
+        
+        # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
+        action_scale = 0.1  # Adjust based on your robot's characteristics
+        
+        # Robot 1 - Apply relative changes
+        # Scale actions from [-1, 1] to [-action_scale, action_scale]
         action_deltas_1 = self.actions["robot_1"] * action_scale
-
-        # Smooth delta action
-        smoothed_deltas_1 = alpha * self.robot_1_prev_deltas + (1.0 - alpha) * action_deltas_1
-        self.robot_1_prev_deltas = smoothed_deltas_1.clone()
-
-        q_1 = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
-        qd_1 = self.robot_1.data.joint_vel[:, self.actuated_dof_indices]
-
-        q_target_1 = q_1 + smoothed_deltas_1
-
-        q_target_1 = saturate(
-            q_target_1,
+        
+        # Update targets by adding deltas to CURRENT positions (not previous targets)
+        current_joint_pos = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
+        self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+            current_joint_pos + action_deltas_1
+        )
+        
+        # Apply moving average for smoothing
+        self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
+            self.cfg.act_moving_average * self.robot_1_prev_targets[:, self.actuated_dof_indices]
+            + (1.0 - self.cfg.act_moving_average) * self.robot_1_curr_targets[:, self.actuated_dof_indices]
+        )
+        
+        # Clamp to joint limits
+        self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
+            self.robot_1_curr_targets[:, self.actuated_dof_indices],
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
-
-        self.robot_1_curr_targets[:, self.actuated_dof_indices] = q_target_1
-        self.robot_1_prev_targets[:, self.actuated_dof_indices] = q_target_1.clone()
-
-        pos_error_1 = q_target_1 - q_1
-        vel_error_1 = -qd_1
-        torques_1 = kp * pos_error_1 + kd * vel_error_1
-
-        # Gravity compensation if available
-        if hasattr(self.robot_1.data, "gravity_force"):
-            torques_1 += self.robot_1.data.gravity_force[:, self.actuated_dof_indices]
-
-        torques_1 = torch.clamp(torques_1, -max_torque, max_torque)
-
-        self.robot_1.set_joint_effort_target(torques_1, joint_ids=self.actuated_dof_indices)
-
-        # ---------------------------
-        # Robot 2
-        # ---------------------------
+        
+        # Robot 2 - Same approach
         action_deltas_2 = self.actions["robot_2"] * action_scale
-
-        smoothed_deltas_2 = alpha * self.robot_2_prev_deltas + (1.0 - alpha) * action_deltas_2
-        self.robot_2_prev_deltas = smoothed_deltas_2.clone()
-
-        q_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
-        qd_2 = self.robot_2.data.joint_vel[:, self.actuated_dof_indices]
-
-        q_target_2 = q_2 + smoothed_deltas_2
-
-        q_target_2 = saturate(
-            q_target_2,
+        
+        current_joint_pos_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
+        self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
+            current_joint_pos_2 + action_deltas_2
+        )
+        
+        self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
+            self.cfg.act_moving_average * self.robot_2_prev_targets[:, self.actuated_dof_indices]
+            + (1.0 - self.cfg.act_moving_average) * self.robot_2_curr_targets[:, self.actuated_dof_indices]
+        )
+        
+        self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
+            self.robot_2_curr_targets[:, self.actuated_dof_indices],
             self.hand_dof_lower_limits[:, self.actuated_dof_indices],
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
+        
+        # Store previous targets for next iteration
+        self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
+        self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
+        
+        # Apply the targets
+        self.robot_1.set_joint_position_target(
+            self.robot_1_curr_targets[:, self.actuated_dof_indices], 
+            joint_ids=self.actuated_dof_indices,
+        )
+        
+        # Uncomment when ready to control robot_2
+        # self.robot_2.set_joint_position_target(
+        #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
+        #     joint_ids=self.actuated_dof_indices
+        # )
 
-        self.robot_2_curr_targets[:, self.actuated_dof_indices] = q_target_2
-        self.robot_2_prev_targets[:, self.actuated_dof_indices] = q_target_2.clone()
 
-        pos_error_2 = q_target_2 - q_2
-        vel_error_2 = -qd_2
-        torques_2 = kp * pos_error_2 + kd * vel_error_2
-
-        if hasattr(self.robot_2.data, "gravity_force"):
-            torques_2 += self.robot_2.data.gravity_force[:, self.actuated_dof_indices]
-
-        torques_2 = torch.clamp(torques_2, -max_torque, max_torque)
-
-        # Uncomment to enable Robot 2
-        # self.robot_2.set_joint_effort_target(torques_2, joint_ids=self.actuated_dof_indices)
-
+    
 
     def _get_states(self):
         
