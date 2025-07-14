@@ -176,6 +176,7 @@ class PhaseDetector:
                 gripper_width < 0.8) & (gripper_width > 0.5) & prev_phases[:, Phases.REACH_OBJ_GRIP.value]) &
             (~obj_above_ground) &
             ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value] & 
+            self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value] & 
             (ee1_obj_grip_dist > self.GRIP_CLOSE_THRESHOLD)
         )
 
