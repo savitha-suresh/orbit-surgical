@@ -64,6 +64,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.markers_goal = VisualizationMarkers(self.cfg.goal_pos_cfg)
         self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
         self.grip_tgt_marker = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg)
+        self.grip_lnk_marker = VisualizationMarkers(self.cfg.grip_lnk_pos_cfg)
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
         self.hand_dof_upper_limits = joint_pos_limits[..., 1]
@@ -96,6 +97,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.markers_goal.visualize(goal_pos)
         self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
         self.grip_tgt_marker.visualize(self.get_gripper_link_target_pos())
+        self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
 
         
 
@@ -596,7 +598,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         height = obj_pos[:, 2] - self.cfg.ground_height
         rewards[:, Phases.LIFT.value] += torch.where(
                             self.not_visited_mask[:, Phases.LIFT.value],
-                            200*height ,
+                            20*height ,
                             rewards[:, Phases.LIFT.value] )
         #rewards[:, Phases.LIFT.value] += 10*height
 

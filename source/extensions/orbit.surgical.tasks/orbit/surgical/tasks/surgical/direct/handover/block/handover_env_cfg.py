@@ -242,10 +242,20 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
                     ),
                 },
             )
+    
+    grip_lnk_pos_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.003,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((0.3, 0.6, 0.6))),
+                    ),
+                },
+            )
 
     # Constants for logic (used in reward, reset, etc.)
     ee_link_name: str = "psm_tool_tip_link"
-    gripper_name: str = "psm_tool_gripper1_link"
+    gripper_name: str = "psm_tool_roll_link"
     reset_position_noise = 0.01
     reset_rot_noise = 0.1
     reset_dof_pos_noise = 0.2  # range of dof pos at reset
