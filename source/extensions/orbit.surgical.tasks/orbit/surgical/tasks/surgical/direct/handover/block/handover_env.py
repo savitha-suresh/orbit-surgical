@@ -191,6 +191,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
             gripper_to_target = gripper_target_pos - gripper_link_pos
             gripper_to_target_dir = gripper_to_target / (torch.norm(gripper_to_target, dim=-1, keepdim=True) + 1e-8)
             gripper_to_target_distance = torch.norm(gripper_to_target, dim=-1, keepdim=True)
+
+
+            obj_griplink_target_pos = self.get_obj_griplnk_tgt_pos()
+            objgripper_to_target = obj_griplink_target_pos - gripper_link_pos
+            objgripper_to_target_dir = objgripper_to_target / (torch.norm(objgripper_to_target, dim=-1, keepdim=True) + 1e-8)
+            objgripper_to_target_distance = torch.norm(objgripper_to_target, dim=-1, keepdim=True)
+
+
             # Concatenate RELATIVE observations
             obs_list = [
                 joint_pos_rel,                    # Joint positions (already relative)
@@ -201,14 +209,17 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 ee_to_p1,                         # Vector from EE to waypoint
                 ee_to_grip, 
                 gripper_to_target,
+                objgripper_to_target,
                 ee_to_obj_distance,               # Distance to object
                 ee_to_goal_distance,              # Distance to goal
                 ee_to_grip_distance, 
                 gripper_to_target_distance,
+                objgripper_to_target_distance,
                 ee_to_obj_dir,                    # Direction to object (normalized)
                 ee_to_goal_dir,                   # Direction to goal (normalized)
                 obj_to_goal_dir,                  # Direction object should move
                 gripper_to_target_dir,
+                objgripper_to_target_dir,
                 ee_to_p1_dir,                     # Direction to waypoint
                 ee_to_grip_dir,
                 self.not_visited_mask,            # Task phase info
@@ -403,6 +414,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #pos_new[:, 1] += 0.01
         return  pos_new
     
+    def get_obj_griplnk_tgt_pos(self):
+        obj_grip_pos = self._get_obj_pos()
+        pos_new = obj_grip_pos.clone()
+        pos_new[:, 2] += 0.0179 # calculated by printing the distance
+        return pos_new
+    
     def get_obj_grip_pos(self):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
@@ -487,6 +504,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         goal_pos = self.get_goal_pos(obj_pos)
         gripper_link_pos = self.get_gripper_link_pos(self.robot_1)
         gripper_link_tgt = self.get_gripper_link_target_pos()
+        obj_griplink_pos = self.get_obj_griplnk_tgt_pos()
         obj_grip_pos = self.get_obj_grip_pos()
         log_if(not self.cfg.is_training, "phase_regressed_mask", phase_regressed_mask)
         rewards = torch.zeros((num_envs, num_phases), device=device)
@@ -510,10 +528,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #print("rew", rewards)
         # phase 0: REACH_OBJ
         dist_obj_ee = torch.norm(obj_pos - ee_1, dim=-1)
-        
+        dist_obj_griplnk = torch.norm(obj_griplink_pos - gripper_link_pos, dim=-1)
         rewards[:, Phases.REACH_OBJ.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_OBJ.value],
                             2* torch.exp(-50 * dist_obj_ee) ,
+                            rewards[:, Phases.REACH_OBJ.value] )
+        rewards[:, Phases.REACH_OBJ.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ.value],
+                            2* torch.exp(-50 * dist_obj_griplnk) ,
                             rewards[:, Phases.REACH_OBJ.value] )
         # rewards[:, Phases.REACH_OBJ.value] +=  (
         #     2* torch.exp(-50 * dist_obj_ee)
