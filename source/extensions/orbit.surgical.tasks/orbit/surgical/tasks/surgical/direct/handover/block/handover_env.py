@@ -705,8 +705,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #     terminated = fallen | invalid_move
         # else:
         terminated = fallen #| self.phase_regressed_mask
+        terminated = torch.zeros_like(timeout, dtype=torch.bool)
+
         return (
-            {agent: False  for agent in self.cfg.possible_agents},
+            {agent: terminated.clone()  for agent in self.cfg.possible_agents},
             {agent: timeout.clone() for agent in self.cfg.possible_agents}
         )
 
