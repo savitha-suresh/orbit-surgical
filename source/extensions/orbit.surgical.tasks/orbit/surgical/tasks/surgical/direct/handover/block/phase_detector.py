@@ -221,7 +221,8 @@ class PhaseDetector:
 
         # # PHASE 3: LIFT
         phase_mask[:, Phases.LIFT.value] = (
-            (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) &
+            (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) & 
+            (grip_link_tgt_dist <= self.GRIP_THRESHOLD) &
             (~obj_above_ground) &
             (gripper_width < 0.1) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
         )
