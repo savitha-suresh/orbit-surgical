@@ -326,7 +326,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         action_scale = torch.full((self.num_envs, 1), base_scale, device=self.device)
 
         # Check if GRIP_OPEN phase is active (1 or True)
-        grip_open_active = self.current_phases[:, Phases.REACH_OBJ_GRIP.value] | self.current_phases[:, Phases.GRIP_1_CLOSE.value]
+        grip_open_active = self.current_phases[:, Phases.REACH_OBJ_GRIP.value].bool() | self.current_phases[:, Phases.GRIP_1_CLOSE.value].bool()
 
         # Apply reduced scale where grip is open
         action_scale[grip_open_active] = reduced_scale
