@@ -327,7 +327,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         # Check if GRIP_OPEN phase is active (1 or True)
         grip_open_active = self.current_phases[:, Phases.REACH_OBJ_GRIP.value].bool() | self.current_phases[:, Phases.GRIP_1_CLOSE.value].bool()
-
+        lift_active = self.current_phases[:, Phases.LIFT.value].bool()
         # Apply reduced scale where grip is open
         action_scale[grip_open_active] = reduced_scale
 
@@ -383,7 +383,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
             self.robot_1_curr_targets[:, self.actuated_dof_indices], 
             joint_ids=self.actuated_dof_indices,
         )
-        
+    
+    
         # Uncomment when ready to control robot_2
         # self.robot_2.set_joint_position_target(
         #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
@@ -629,7 +630,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         height = obj_pos[:, 2] - self.cfg.ground_height
         rewards[:, Phases.LIFT.value] += torch.where(
                             self.not_visited_mask[:, Phases.LIFT.value],
-                            20*height ,
+                            2*height ,
                             rewards[:, Phases.LIFT.value] )
         #rewards[:, Phases.LIFT.value] += 10*height
 
@@ -705,7 +706,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # else:
         terminated = fallen #| self.phase_regressed_mask
         return (
-            {agent: terminated.clone()  for agent in self.cfg.possible_agents},
+            {agent: False  for agent in self.cfg.possible_agents},
             {agent: timeout.clone() for agent in self.cfg.possible_agents}
         )
 

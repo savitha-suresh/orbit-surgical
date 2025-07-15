@@ -84,9 +84,9 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=16,
                     solver_velocity_iteration_count=16,
-                    max_angular_velocity=0.1,
-                    max_linear_velocity=0.1,
-                    max_depenetration_velocity=1.0,
+                    max_angular_velocity=10,
+                    max_linear_velocity=10,
+                    max_depenetration_velocity=2.0,
                     disable_gravity=False,
                 ),
             ),
