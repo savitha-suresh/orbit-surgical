@@ -413,7 +413,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_gripper_link_target_pos(self):
         obj_grip_pos = self.get_obj_grip_pos()
         pos_new = obj_grip_pos.clone()
-        pos_new[:, 2] += 0.0093 # calculated by printing the distance
+        pos_new[:, 2] += 0.0179 # calculated by printing the distance
         return pos_new
 
     def get_p1_pos(self, obj_position, approach_angle=35): 
