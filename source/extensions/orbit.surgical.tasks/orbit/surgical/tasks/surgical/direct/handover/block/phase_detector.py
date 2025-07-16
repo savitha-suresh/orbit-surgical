@@ -192,17 +192,19 @@ class PhaseDetector:
         # PHASE 2: GRIP_1_CLOSE
         phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
             (
-                (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) | (
-                    (ee1_obj_grip_dist > self.GRIP_THRESHOLD) &
-                    (ee1_obj_grip_dist <= 0.02) &
-                    (prev_phases[:, Phases.GRIP_1_CLOSE.value])
-                )
+                (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) 
+                # | (
+                #     (ee1_obj_grip_dist > self.GRIP_THRESHOLD) &
+                #     (ee1_obj_grip_dist <= 0.02) &
+                #     (prev_phases[:, Phases.GRIP_1_CLOSE.value])
+                # )
             ) & (
-                (grip_link_tgt_dist <= self.GRIP_THRESHOLD) | (
-                    (grip_link_tgt_dist > self.GRIP_THRESHOLD) &
-                    (grip_link_tgt_dist <= 0.02) &
-                    (prev_phases[:, Phases.GRIP_1_CLOSE.value])
-                )
+                (grip_link_tgt_dist <= self.GRIP_THRESHOLD) 
+                # | (
+                #     (grip_link_tgt_dist > self.GRIP_THRESHOLD) &
+                #     (grip_link_tgt_dist <= 0.02) &
+                #     (prev_phases[:, Phases.GRIP_1_CLOSE.value])
+                # )
             ) &
             (~obj_above_ground) &
             (
