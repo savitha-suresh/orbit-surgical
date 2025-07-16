@@ -230,11 +230,11 @@ class PhaseDetector:
         )
 
         # # PHASE 4: REACH_GOAL_1
-        # phase_mask[:, Phases.REACH_GOAL_1.value] = (
-        #     robot_1_holding &
-        #     obj_above_ground &
-        #     (ee1_goal_dist > self.FAR_THRESHOLD)
-        # )
+        phase_mask[:, Phases.REACH_GOAL_1.value] = (
+            robot_1_holding &
+            obj_above_ground &
+            (ee1_goal_dist > self.FAR_THRESHOLD)
+        )
 
         # # PHASE 5: REACH_GOAL_2
         # phase_mask[:, Phases.REACH_GOAL_2.value] = (
