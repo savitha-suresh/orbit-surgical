@@ -1213,7 +1213,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.robot_2_prev_deltas = torch.zeros_like(self.robot_2.data.joint_pos[:, self.actuated_dof_indices])
 
         
-        
+        new_rot = torch.tensor([1.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(env_ids), 1)
+
         self.object.write_root_pose_to_sim(torch.cat((new_pos, new_rot), dim=-1), env_ids)
         
         self.count = 0

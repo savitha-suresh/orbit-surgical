@@ -382,13 +382,18 @@ class EvaluationMetrics:
     def update_height_data(self, obj_positions: torch.Tensor, timestep: int):
         above_threshold = obj_positions[:, 2] > self.height_threshold
         #print("obj_positions", obj_positions)
+        
         for env_idx in range(self.num_envs):
             if above_threshold[env_idx]:
                 if self.episode_data['height_success_count'] == 0:
                     self.episode_data['height_success_timesteps'][env_idx] = timestep
                     self.episode_data['height_success_count'] = 1
+                if self.episode_data['obj_drop_count'] == 1:
+                    self.episode_data['obj_drop_count'] = 0
+            
             else:
-                if self.episode_data['height_success_count'] == 1:
+            
+                if self.episode_data['height_success_count'] == 1 and timestep < 498:
                     self.episode_data['obj_drop_count'] = 1
     
 
