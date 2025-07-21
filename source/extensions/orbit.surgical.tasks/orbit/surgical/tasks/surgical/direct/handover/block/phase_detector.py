@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 
 def log_if(condition, *args, **kwargs):
+    return
     if condition:
         print(*args, **kwargs)
 

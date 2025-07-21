@@ -61,7 +61,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.r2_init_pos[:, :] = torch.tensor([-0.18, 0.0, 0.15], device=self.device)
         self.current_phases = torch.zeros((self.num_envs, len(Phases)), dtype=torch.float, device=self.device)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
-
+        self.original_obj_positions = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
 
         self.phase_regressed_mask = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
         self.num_hand_dofs = self.robot_1.num_joints
@@ -879,8 +879,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #print("visited", self.not_visited_mask, mask, self.not_visited_mask[env_ids, Phases.REACH_P1.value])
         self.not_visited_mask[mask, Phases.REACH_P1.value] = False
         rewards[mask, Phases.REACH_OBJ.value] += 2000
-        #print("rew", rewards)
-        # phase 0: REACH_OBJ
+        self.original_obj_positions[mask, :] = self._get_obj_pos()[mask, :]
+        
+        # phase 1: REACH_OBJ
         dist_obj_ee = torch.norm(obj_pos - ee_1, dim=-1)
         dist_obj_griplnk = torch.norm(obj_griplink_pos - gripper_link_pos, dim=-1)
         rewards[:, Phases.REACH_OBJ.value] += torch.where(
@@ -1218,6 +1219,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.count = 0
         
         self._compute_intermediate_values()
+        # self.original_obj_positions = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
 
 
 
