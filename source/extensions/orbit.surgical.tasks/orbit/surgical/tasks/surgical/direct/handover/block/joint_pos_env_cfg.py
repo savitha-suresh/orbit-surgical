@@ -86,7 +86,7 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
                     solver_velocity_iteration_count=16,
                     max_angular_velocity=0.1,
                     max_linear_velocity=0.1,
-                    max_depenetration_velocity=10.0,
+                    max_depenetration_velocity=1.0,
                     disable_gravity=False,
                 ),
             ),
