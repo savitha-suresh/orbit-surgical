@@ -433,7 +433,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_grip_pos(self):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] += 0.001
+        pos_new[:, 2] += 0.0009
         pos_new[:, 0] +=0.01
         return  pos_new
     

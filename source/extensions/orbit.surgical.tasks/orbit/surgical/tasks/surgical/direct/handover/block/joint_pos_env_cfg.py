@@ -79,14 +79,14 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
             prim_path="{ENV_REGEX_NS}/Object",
             init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.05), rot=(1, 0, 0, 0)),
             spawn=UsdFileCfg(
-                usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block.usd",
+                usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block.usda",
                 scale=(0.011, 0.011, 0.011),
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=16,
                     solver_velocity_iteration_count=16,
                     max_angular_velocity=0.1,
                     max_linear_velocity=0.1,
-                    max_depenetration_velocity=1.0,
+                    max_depenetration_velocity=10.0,
                     disable_gravity=False,
                 ),
             ),
@@ -132,6 +132,6 @@ class BlockHandoverEnvCfg_PLAY(BlockHandoverEnvCfg):
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         self.is_training = False
-        self.episode_length_s = 5
+        self.episode_length_s = 10
         # disable randomization for play
         #self.observations.policy.enable_corruption = False
