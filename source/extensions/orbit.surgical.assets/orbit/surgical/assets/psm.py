@@ -60,8 +60,8 @@ PSM_CFG = ArticulationCfg(
                 "psm_tool_yaw_joint",
             ],
             effort_limit=12.0,
-            velocity_limit=1.0,
-            stiffness=800.0,
+            velocity_limit=1,
+            stiffness=300.0,
             damping=40.0,
         ),
         "psm_tool": ImplicitActuatorCfg(
