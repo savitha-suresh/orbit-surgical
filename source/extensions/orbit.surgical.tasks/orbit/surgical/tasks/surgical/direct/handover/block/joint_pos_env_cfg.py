@@ -79,7 +79,7 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
             prim_path="{ENV_REGEX_NS}/Object",
             init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.05), rot=(1, 0, 0, 0)),
             spawn=UsdFileCfg(
-                usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block.usda",
+                usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block.usd",
                 scale=(0.011, 0.011, 0.011),
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=16,
