@@ -424,10 +424,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #pos_new[:, 1] += 0.01
         return  pos_new
     
+
+    def get_dist_toadjust_griplink(self):
+        gripper_link_pos = self.get_gripper_link_pos(self.robot_1)
+        ee_1 = self._get_ee_position(self.robot_1)
+        return torch.norm(gripper_link_pos - ee_1, dim=-1)
+    
     def get_obj_griplnk_tgt_pos(self):
         obj_grip_pos = self._get_obj_pos()
         pos_new = obj_grip_pos.clone()
-        pos_new[:, 2] += 0.0179 # calculated by printing the distance
+        pos_new[:, 2] += self.get_dist_toadjust_griplink() # calculated by printing the distance
         return pos_new
     
     def get_obj_grip_pos(self):
@@ -440,7 +446,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_gripper_link_target_pos(self):
         obj_grip_pos = self.get_obj_grip_pos()
         pos_new = obj_grip_pos.clone()
-        pos_new[:, 2] += 0.0179 # calculated by printing the distance
+        pos_new[:, 2] += self.get_dist_toadjust_griplink() # calculated by printing the distance
         return pos_new
 
     def get_p1_pos(self, obj_position, approach_angle=35): 
@@ -559,7 +565,6 @@ class DualArmHandoverEnv(DirectMARLEnv):
         log_if(not self.cfg.is_training, "gripper width", gripper_width)
         #
         
-
         mask_ro = (dist_obj_ee <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & (
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_OPEN.value].bool()))
