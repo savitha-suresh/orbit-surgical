@@ -3,7 +3,8 @@ from orbit.surgical.assets import ORBITSURGICAL_ASSETS_DATA_DIR
 from isaaclab.assets import RigidObjectCfg
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
-from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
+from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg, CollisionPropertiesCfg
+from isaaclab.sim.spawners.materials.physics_materials_cfg import PhysicsMaterialCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from isaaclab.utils import configclass
 from isaaclab.envs import mdp
@@ -76,21 +77,30 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
 
         # Set Peg Block as object
         self.scene.object = RigidObjectCfg(
-            prim_path="{ENV_REGEX_NS}/Object",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.05), rot=(1, 0, 0, 0)),
-            spawn=UsdFileCfg(
-                usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block_backup.usda",
-                scale=(0.011, 0.011, 0.011),
-                rigid_props=RigidBodyPropertiesCfg(
-                    solver_position_iteration_count=16,
-                    solver_velocity_iteration_count=16,
-                    max_angular_velocity=0.1,
-                    max_linear_velocity=0.1,
-                    max_depenetration_velocity=1.0,
-                    disable_gravity=False,
-                ),
+        prim_path="{ENV_REGEX_NS}/Object",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.05), rot=(1, 0, 0, 0)),
+        spawn=UsdFileCfg(
+            usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block_backup.usda",
+            scale=(0.011, 0.011, 0.011),
+            rigid_props=RigidBodyPropertiesCfg(
+                solver_position_iteration_count=64,  # Higher for small objects
+                solver_velocity_iteration_count=32,
+                max_angular_velocity=0.1,  # Allow natural movement
+                max_linear_velocity=0.1,   # Allow natural movement
+                max_depenetration_velocity=0.09,  # Higher to resolve penetration faster
+                disable_gravity=False,
+                linear_damping=0.2,  # Light damping to prevent bouncing
+                angular_damping=0.3,  # Light rotational damping
             ),
-        )
+            # Add physics material for the object
+            
+            # Add collision properties
+            collision_props=CollisionPropertiesCfg(
+                contact_offset=0.0015,  # Small but sufficient for tiny object
+                rest_offset=0.001,     # Very small rest offset
+            ),
+        ),
+    )
 
         # Listens to the required transforms
         marker_cfg = FRAME_MARKER_CFG.copy()
@@ -132,6 +142,6 @@ class BlockHandoverEnvCfg_PLAY(BlockHandoverEnvCfg):
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         self.is_training = False
-        self.episode_length_s = 10
+        self.episode_length_s = 5
         # disable randomization for play
         #self.observations.policy.enable_corruption = False

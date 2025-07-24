@@ -43,7 +43,7 @@ class PhaseDetector:
         self.SUPER_CLOSE_THRESHOLD = 0.01  # 2cm
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
-        self.GRIP_CLOSE_THRESHOLD = 0.01
+        self.GRIP_CLOSE_THRESHOLD = 0.008
         
     def _get_ee_position(self, robot):
         ee_pos = robot.data.body_pos_w[:, robot.find_bodies(self.cfg.ee_link_name)[0]]
@@ -192,14 +192,14 @@ class PhaseDetector:
         # PHASE 2: GRIP_1_CLOSE
         phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
             (
-                (ee1_obj_grip_dist <= self.GRIP_THRESHOLD) 
+                (ee1_obj_grip_dist <= self.GRIP_CLOSE_THRESHOLD) 
                 # | (
                 #     (ee1_obj_grip_dist > self.GRIP_THRESHOLD) &
                 #     (ee1_obj_grip_dist <= 0.02) &
                 #     (prev_phases[:, Phases.GRIP_1_CLOSE.value])
                 # )
             ) & (
-                (grip_link_tgt_dist <= self.GRIP_THRESHOLD) 
+                (grip_link_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) 
                 # | (
                 #     (grip_link_tgt_dist > self.GRIP_THRESHOLD) &
                 #     (grip_link_tgt_dist <= 0.02) &

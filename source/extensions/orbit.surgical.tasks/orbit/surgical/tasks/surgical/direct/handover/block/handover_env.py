@@ -322,7 +322,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
         base_scale = 0.19
-        reduced_scale = 0.15
+        reduced_scale = 0.1
         action_scale = torch.full((self.num_envs, 1), base_scale, device=self.device)
 
         # Check if GRIP_OPEN phase is active (1 or True)
@@ -374,15 +374,56 @@ class DualArmHandoverEnv(DirectMARLEnv):
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
         
+
+        gripper_dof_idxs = self.actuated_dof_indices[-2:]
+        grip_close_mask = self.current_phases[:, Phases.GRIP_1_CLOSE.value].bool() | ~self.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
+        grip_envs = torch.nonzero(grip_close_mask).squeeze(-1)
+        non_grip_envs = torch.nonzero(~grip_close_mask).squeeze(-1)
+
+        # Copy over previous targets for gripper-close envs
+        if grip_envs.numel() > 0:
+            closed_position = 0.0  # or whatever your closed position should be
+            current_targets = self.robot_1.data.joint_pos_target.clone()
+            current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
+            
+            # Set high position gains for immediate response
+            self.robot_1.set_joint_position_target(
+                current_targets[grip_envs[:, None], gripper_dof_idxs],
+                env_ids=grip_envs, joint_ids=gripper_dof_idxs)
+            
+            # Option 2: Set velocity directly for controlled closure
+            # current_velocities = self.robot_1.data.joint_vel_target.clone()
+            # close_velocity = -20.0  # negative for closing, adjust magnitude as needed
+            # current_velocities[grip_envs[:, None], self.actuated_dof_indices[:-2]] = close_velocity
+            # self.robot_1.set_joint_velocity_target(
+            #     current_velocities[grip_envs[:, None], self.actuated_dof_indices[:-2]],
+            #     env_ids=grip_envs, joint_ids=self.actuated_dof_indices[:-2])
+            #self.robot_1_curr_targets[grip_envs[:, None], :] = 0.0
+
+            # # Set only gripper joints for gripper-close envs
+            # self.robot_1.set_joint_position_target(
+            #     self.robot_1_curr_targets[grip_envs[:, None], gripper_dof_idxs],
+            #     env_ids=grip_envs,
+            #     joint_ids=gripper_dof_idxs,
+            # )
+
+        # For the remaining envs, set all actuated joints
+        if non_grip_envs.numel() > 0:
+            self.robot_1.set_joint_position_target(
+                self.robot_1_curr_targets[non_grip_envs[:, None], self.actuated_dof_indices],
+                env_ids=non_grip_envs,
+                joint_ids=self.actuated_dof_indices,
+            )
+
         # Store previous targets for next iteration
         self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
         self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
         
         # Apply the targets
-        self.robot_1.set_joint_position_target(
-            self.robot_1_curr_targets[:, self.actuated_dof_indices], 
-            joint_ids=self.actuated_dof_indices,
-        )
+        # self.robot_1.set_joint_position_target(
+        #     self.robot_1_curr_targets[:, self.actuated_dof_indices], 
+        #     joint_ids=self.actuated_dof_indices,
+        # )
     
     
         # Uncomment when ready to control robot_2
@@ -420,7 +461,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
         pos_new[:, 2] += 0.02
-        pos_new[:, 0] +=0.01
+        pos_new[:, 0] +=0.008
+        pos_new[:, 1] -= 0.005
         #pos_new[:, 1] += 0.01
         return  pos_new
     
@@ -439,8 +481,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_grip_pos(self):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] += 0.001
-        pos_new[:, 0] +=0.01
+        pos_new[:, 2] -= 0.005
+        pos_new[:, 0] +=0.008
+        pos_new[:, 1] -= 0.005
         return  pos_new
     
     def get_gripper_link_target_pos(self):
@@ -565,7 +608,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         log_if(not self.cfg.is_training, "gripper width", gripper_width)
         #
         
-        mask_ro = (dist_obj_ee <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & (
+        mask_ro = (dist_obj_ee <= self.phase_detector.CLOSE_THRESHOLD) & (
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_OPEN.value].bool()))
 
@@ -579,7 +622,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             rewards[:, Phases.GRIP_1_OPEN.value] )
         #rewards[:, Phases.GRIP_1_OPEN.value] +=  gripper_width * 2
 
-        mask_open = (dist_obj_ee <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & (
+        mask_open = (dist_obj_ee <= self.phase_detector.CLOSE_THRESHOLD) & (
                     ~self.phase_detector.is_gripper_closed(self.robot_1) & 
                     self.not_visited_mask[env_ids, Phases.GRIP_1_OPEN.value] & 
                     (phases_one_hot[env_ids, Phases.REACH_OBJ_GRIP.value].bool()))
@@ -605,7 +648,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
 
 
-        mask_grip = (dist_obj_grip_ee1 <= self.phase_detector.GRIP_THRESHOLD) & ( 
+        mask_grip = ((dist_obj_grip_ee1 <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & 
+                     (dist_gripper_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD)) & ( 
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ_GRIP.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE.value].bool()))
 
