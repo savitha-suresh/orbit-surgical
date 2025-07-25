@@ -119,26 +119,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.scene.articulations["robot_2"] = self.robot_2
         self.scene.rigid_objects["object"] = self.object
 
-    
-    def get_gripper_tip_positions(self, robot, jaw_radius=0.0179):
-        # 1. Get gripper displacements
-        gripper_pos = self.phase_detector.get_gripper_pos(robot)  # shape: (num_envs, 2)
-        jaw_disp = gripper_pos * jaw_radius
-        # 2. Get pose of tool_tip_link
-        ee_pose = self._get_ee_pose(robot)
-        tip_pos = ee_pose[:, :3]            # (num_envs, 4) as quaternion
-        tip_rot = ee_pose[:, 3:]
-        # 3. Convert rotation to matrix
-        tip_rot_mat = quat_to_matrix(tip_rot)   # shape: (num_envs, 3, 3)
 
-        # 4. Gripper opening is along local Y axis
-        x_axis = tip_rot_mat[:, :, 0]                       # local X axis
-
-        # Only use joint displacement, no jaw_length added
-        gr1_tip_pos = tip_pos + x_axis * jaw_disp[:, 0:1]
-        gr2_tip_pos = tip_pos + x_axis * jaw_disp[:, 1:2]
-
-        return gr1_tip_pos, gr2_tip_pos
         
     def _pre_physics_step(self, actions):
     
@@ -242,10 +223,21 @@ class DualArmHandoverEnv(DirectMARLEnv):
             ee_to_p1_dir = ee_to_p1 / (torch.norm(ee_to_p1, dim=-1, keepdim=True) + 1e-8)
 
 
-            grip_pos = self.get_obj_grip_pos()
-            ee_to_grip = grip_pos - ee_pose[:, :3]
-            ee_to_grip_dir = ee_to_grip / (torch.norm(ee_to_grip, dim=-1, keepdim=True) + 1e-8)
-            ee_to_grip_distance = torch.norm(ee_to_grip, dim=-1, keepdim=True)
+            grip_pos = self.get_gripper_tip_positions(self.robot_1)
+            grp_tgt_pos = self.get_gripper_target_points()
+            grp1_tgt_pos = grp_tgt_pos[0]
+            grp2_tgt_pos = grp_tgt_pos[1]
+            grip1_pos = grip_pos[0]
+            grip2_pos = grip_pos[1]
+
+            ee1_to_grip = grp1_tgt_pos - grip1_pos
+            ee1_to_grip_dir = ee1_to_grip / (torch.norm(ee1_to_grip, dim=-1, keepdim=True) + 1e-8)
+            ee1_to_grip_distance = torch.norm(ee1_to_grip, dim=-1, keepdim=True)
+
+            
+            ee2_to_grip = grp2_tgt_pos - grip2_pos
+            ee2_to_grip_dir = ee2_to_grip / (torch.norm(ee2_to_grip, dim=-1, keepdim=True) + 1e-8)
+            ee2_to_grip_distance = torch.norm(ee2_to_grip, dim=-1, keepdim=True)
 
 
             gripper_target_pos = self.get_gripper_link_target_pos()
@@ -268,12 +260,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 ee_to_goal,                       # Vector from EE to goal
                 obj_to_goal,                      # Vector from object to goal
                 ee_to_p1,                         # Vector from EE to waypoint
-                ee_to_grip, 
+                ee1_to_grip, 
+                ee2_to_grip,
                 gripper_to_target,
                 objgripper_to_target,
                 ee_to_obj_distance,               # Distance to object
                 ee_to_goal_distance,              # Distance to goal
-                ee_to_grip_distance, 
+                ee1_to_grip_distance, 
+                ee2_to_grip_distance,
                 gripper_to_target_distance,
                 objgripper_to_target_distance,
                 ee_to_obj_dir,                    # Direction to object (normalized)
@@ -282,7 +276,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 gripper_to_target_dir,
                 objgripper_to_target_dir,
                 ee_to_p1_dir,                     # Direction to waypoint
-                ee_to_grip_dir,
+                ee1_to_grip_dir,
+                ee2_to_grip_dir,
                 self.not_visited_mask,            # Task phase info
                 self.phase_regressed_mask.unsqueeze(1)
             ]
@@ -546,7 +541,31 @@ class DualArmHandoverEnv(DirectMARLEnv):
         pos_new[:, 1] += 0.007
         return  pos_new
     
+    def get_gripper_tip_positions(self, robot, jaw_radius=0.0179):
+        # 1. Get gripper displacements
+        gripper_pos = self.phase_detector.get_gripper_pos(robot)  # shape: (num_envs, 2)
+        jaw_disp = gripper_pos * jaw_radius
+        # 2. Get pose of tool_tip_link
+        ee_pose = self._get_ee_pose(robot)
+        tip_pos = ee_pose[:, :3]            # (num_envs, 4) as quaternion
+        tip_rot = ee_pose[:, 3:]
+        # 3. Convert rotation to matrix
+        tip_rot_mat = quat_to_matrix(tip_rot)   # shape: (num_envs, 3, 3)
 
+        # 4. Gripper opening is along local Y axis
+        x_axis = tip_rot_mat[:, :, 0]                       # local X axis
+
+        # Only use joint displacement, no jaw_length added
+        gr1_tip_pos = tip_pos + x_axis * jaw_disp[:, 0:1]
+        gr2_tip_pos = tip_pos + x_axis * jaw_disp[:, 1:2]
+
+        return gr1_tip_pos, gr2_tip_pos
+        
+
+    def get_grp_tgt_distance(self, robot):
+        grp_tip_pts = self.get_gripper_tip_positions(robot)
+        grp_tgt_pts = self.get_gripper_target_points()
+        return torch.norm(grp_tip_pts[0] - grp_tgt_pts[0], dim=-1), torch.norm(grp_tip_pts[1] - grp_tgt_pts[1], dim=-1)
 
     def get_gripper_target_points(self):
         displacement = 0.35
@@ -704,11 +723,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.not_visited_mask[mask_open, Phases.GRIP_1_OPEN.value] = False
         rewards[mask_open, Phases.REACH_OBJ_GRIP.value] += 2000
 
-
-        dist_obj_grip_ee1 = torch.norm(obj_grip_pos - ee_1, dim=-1)
+        dist_grp_tgt = self.get_grp_tgt_distance(self.robot_1)
+        dist_grp1_tgt, dist_grp2_tgt = dist_grp_tgt
         rewards[:, Phases.REACH_OBJ_GRIP.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value],
-                            2* torch.exp(-100 * dist_obj_grip_ee1) ,
+                            2* torch.exp(-100 * dist_grp1_tgt) ,
+                            rewards[:, Phases.REACH_OBJ_GRIP.value] )
+        
+        rewards[:, Phases.REACH_OBJ_GRIP.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value],
+                            2* torch.exp(-100 * dist_grp2_tgt) ,
                             rewards[:, Phases.REACH_OBJ_GRIP.value] )
         
         dist_gripper_tgt = torch.norm(gripper_link_tgt - gripper_link_pos, dim=-1)
@@ -721,7 +745,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
 
 
-        mask_grip = ((dist_obj_grip_ee1 <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & 
+        mask_grip = ((dist_grp1_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & 
+                     (dist_grp2_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) &
                      (dist_gripper_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD)) & ( 
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ_GRIP.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE.value].bool()))
