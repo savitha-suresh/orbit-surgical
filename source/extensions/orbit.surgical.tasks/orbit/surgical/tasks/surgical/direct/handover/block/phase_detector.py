@@ -43,7 +43,7 @@ class PhaseDetector:
         self.SUPER_CLOSE_THRESHOLD = 0.01  # 2cm
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
-        self.GRIP_CLOSE_THRESHOLD = 0.005
+        self.GRIP_CLOSE_THRESHOLD = 0.01
         
     def _get_ee_position(self, robot):
         ee_pos = robot.data.body_pos_w[:, robot.find_bodies(self.cfg.ee_link_name)[0]]
@@ -89,6 +89,8 @@ class PhaseDetector:
     def is_holding_object(self, obj_position, robot):
         return self._is_holding_object(obj_position, robot)
     
+
+    
     def _is_holding_object(self, obj_position, robot):
         """Check if robot is holding the object"""
         
@@ -105,7 +107,7 @@ class PhaseDetector:
     def is_object_above_ground(self, obj_position, ground_height=0.0149):
         """Check if object is above ground"""
         ground_height = self.cfg.ground_height
-        return obj_position[:, 2] > (ground_height + 0.05)  # 1cm above ground
+        return obj_position[:, 2] > 0.04  # 1cm above ground
     
     def _get_distance(self, pos1, pos2):
         """Calculate Euclidean distance between two positions"""

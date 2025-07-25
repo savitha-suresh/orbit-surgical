@@ -11,6 +11,37 @@ from .phase_detector import Phases, PhaseDetector, log_if
 from isaaclab.markers import VisualizationMarkers
 
 
+def quat_to_matrix(quat: torch.Tensor) -> torch.Tensor:
+    """Convert normalized quaternion (w, x, y, z) to rotation matrix."""
+    qw, qx, qy, qz = quat.unbind(-1)
+
+    xx = qx * qx
+    yy = qy * qy
+    zz = qz * qz
+    xy = qx * qy
+    xz = qx * qz
+    yz = qy * qz
+    wx = qw * qx
+    wy = qw * qy
+    wz = qw * qz
+
+    m00 = 1 - 2 * (yy + zz)
+    m01 = 2 * (xy - wz)
+    m02 = 2 * (xz + wy)
+
+    m10 = 2 * (xy + wz)
+    m11 = 1 - 2 * (xx + zz)
+    m12 = 2 * (yz - wx)
+
+    m20 = 2 * (xz - wy)
+    m21 = 2 * (yz + wx)
+    m22 = 1 - 2 * (xx + yy)
+
+    return torch.stack([
+        torch.stack([m00, m01, m02], dim=-1),
+        torch.stack([m10, m11, m12], dim=-1),
+        torch.stack([m20, m21, m22], dim=-1),
+    ], dim=-2)  # (..., 3, 3)
 
 
 class DualArmHandoverEnv(DirectMARLEnv):
@@ -65,6 +96,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
         self.grip_tgt_marker = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg)
         self.grip_lnk_marker = VisualizationMarkers(self.cfg.grip_lnk_pos_cfg)
+        self.tip_1_marker = VisualizationMarkers(self.cfg.tip_1_cfg)
+        self.tip_2_marker = VisualizationMarkers(self.cfg.tip_2_cfg)
+        self.grp_pt_1_marker = VisualizationMarkers(self.cfg.grp_pt_1_cfg)
+        self.grp_pt_2_marker = VisualizationMarkers(self.cfg.grp_pt_2_cfg)
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
         self.hand_dof_upper_limits = joint_pos_limits[..., 1]
@@ -84,8 +119,27 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.scene.articulations["robot_2"] = self.robot_2
         self.scene.rigid_objects["object"] = self.object
 
+    
+    def get_gripper_tip_positions(self, robot, jaw_radius=0.0179):
+        # 1. Get gripper displacements
+        gripper_pos = self.phase_detector.get_gripper_pos(robot)  # shape: (num_envs, 2)
+        jaw_disp = gripper_pos * jaw_radius
+        # 2. Get pose of tool_tip_link
+        ee_pose = self._get_ee_pose(robot)
+        tip_pos = ee_pose[:, :3]            # (num_envs, 4) as quaternion
+        tip_rot = ee_pose[:, 3:]
+        # 3. Convert rotation to matrix
+        tip_rot_mat = quat_to_matrix(tip_rot)   # shape: (num_envs, 3, 3)
+
+        # 4. Gripper opening is along local Y axis
+        x_axis = tip_rot_mat[:, :, 0]                       # local X axis
+
+        # Only use joint displacement, no jaw_length added
+        gr1_tip_pos = tip_pos + x_axis * jaw_disp[:, 0:1]
+        gr2_tip_pos = tip_pos + x_axis * jaw_disp[:, 1:2]
+
+        return gr1_tip_pos, gr2_tip_pos
         
-     
     def _pre_physics_step(self, actions):
     
         self.actions = actions
@@ -98,6 +152,13 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
         self.grip_tgt_marker.visualize(self.get_gripper_link_target_pos())
         self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
+        grip_pos = self.get_gripper_tip_positions(self.robot_1)
+        
+        self.tip_1_marker.visualize(grip_pos[0])
+        self.tip_2_marker.visualize(grip_pos[1])
+        grip_end_pts = self.get_gripper_target_points()
+        self.grp_pt_1_marker.visualize(grip_end_pts[0])
+        self.grp_pt_2_marker.visualize(grip_end_pts[1])
 
         
 
@@ -461,9 +522,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
         pos_new[:, 2] += 0.02
-        pos_new[:, 0] +=0.008
-        pos_new[:, 1] -= 0.005
-        #pos_new[:, 1] += 0.01
+        pos_new[:, 0] += 0.003
+        pos_new[:, 1] += 0.007
         return  pos_new
     
 
@@ -481,10 +541,23 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_grip_pos(self):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] -= 0.005
-        pos_new[:, 0] +=0.008
-        pos_new[:, 1] -= 0.005
+        pos_new[:, 2] -= 0.002
+        pos_new[:, 0] += 0.004
+        pos_new[:, 1] += 0.007
         return  pos_new
+    
+
+
+    def get_gripper_target_points(self):
+        displacement = 0.35
+        jaw_radius = 0.0179
+        direction = torch.tensor([[1.0, 0.0, 0.0]], device='cuda')
+        direction = torch.nn.functional.normalize(direction, dim=-1)  # ensure unit
+        grip_pt = self.get_obj_grip_pos()
+        world_disp = displacement * jaw_radius
+        grip1 = grip_pt - world_disp * direction
+        grip2 = grip_pt + world_disp * direction
+        return grip1, grip2
     
     def get_gripper_link_target_pos(self):
         obj_grip_pos = self.get_obj_grip_pos()
@@ -784,8 +857,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         new_pos = self.scene.env_origins[env_ids] + pos_noise
         
-        new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
-        # new_rot[0] = torch.tensor([0.5, 0.5, 0.5, 0.5])
+        # new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
+        # new_rot[0] = torch.tensor([0.7071, 0, 0, 0.7071])
+        new_rot = torch.tensor([0.7071, 0, 0, 0.7071], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
 
         self.num_hand_dofs = self.robot_1.num_joints

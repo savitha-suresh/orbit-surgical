@@ -60,7 +60,7 @@ PSM_CFG = ArticulationCfg(
                 "psm_tool_yaw_joint",
             ],
             effort_limit=20.0,
-            velocity_limit=0.1,
+            velocity_limit=0.01,
             stiffness=400.0,
             damping=80.0,
         ),
