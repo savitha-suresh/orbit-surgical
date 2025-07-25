@@ -541,7 +541,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         pos_new[:, 1] += 0.007
         return  pos_new
     
-    def get_gripper_tip_positions(self, robot, jaw_radius=0.0179):
+    def get_gripper_tip_positions(self, robot, jaw_radius=0.01):
         # 1. Get gripper displacements
         gripper_pos = self.phase_detector.get_gripper_pos(robot)  # shape: (num_envs, 2)
         jaw_disp = gripper_pos * jaw_radius
@@ -568,15 +568,15 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return torch.norm(grp_tip_pts[0] - grp_tgt_pts[0], dim=-1), torch.norm(grp_tip_pts[1] - grp_tgt_pts[1], dim=-1)
 
     def get_gripper_target_points(self):
-        displacement = 0.35
-        jaw_radius = 0.0179
+        displacement = 0.5
+        jaw_radius = 0.01
         direction = torch.tensor([[1.0, 0.0, 0.0]], device='cuda')
         direction = torch.nn.functional.normalize(direction, dim=-1)  # ensure unit
         grip_pt = self.get_obj_grip_pos()
         world_disp = displacement * jaw_radius
         grip1 = grip_pt - world_disp * direction
         grip2 = grip_pt + world_disp * direction
-        return grip1, grip2
+        return grip2, grip1
     
     def get_gripper_link_target_pos(self):
         obj_grip_pos = self.get_obj_grip_pos()
