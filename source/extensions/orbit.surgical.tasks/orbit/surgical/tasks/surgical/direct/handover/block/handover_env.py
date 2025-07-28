@@ -517,8 +517,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
         pos_new[:, 2] += 0.02
-        pos_new[:, 0] += 0.003
-        pos_new[:, 1] += 0.007
+        pos_new[:, 0] += 0.008
+        pos_new[:, 1] -= 0.004
         return  pos_new
     
 
@@ -536,9 +536,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_grip_pos(self):
         pos_all = self.object.data.root_pos_w
         pos_new = pos_all.clone()
-        pos_new[:, 2] -= 0.002
-        pos_new[:, 0] += 0.004
-        pos_new[:, 1] += 0.007
+        pos_new[:, 2] -= 0.003
+        pos_new[:, 0] += 0.01
+        pos_new[:, 1] -= 0.004
         return  pos_new
     
     def get_gripper_tip_positions(self, robot, jaw_radius=0.01):
@@ -570,13 +570,13 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_gripper_target_points(self):
         displacement = 0.5
         jaw_radius = 0.01
-        direction = torch.tensor([[1.0, 0.0, 0.0]], device='cuda')
+        direction = torch.tensor([[0.0, 1.0, 0.0]], device='cuda')
         direction = torch.nn.functional.normalize(direction, dim=-1)  # ensure unit
         grip_pt = self.get_obj_grip_pos()
         world_disp = displacement * jaw_radius
         grip1 = grip_pt - world_disp * direction
         grip2 = grip_pt + world_disp * direction
-        return grip2, grip1
+        return grip1, grip2
     
     def get_gripper_link_target_pos(self):
         obj_grip_pos = self.get_obj_grip_pos()
@@ -700,7 +700,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         log_if(not self.cfg.is_training, "gripper width", gripper_width)
         #
         
-        mask_ro = (dist_obj_ee <= self.phase_detector.CLOSE_THRESHOLD) & (
+        mask_ro = ((dist_obj_ee <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
+                (dist_obj_griplnk <= self.phase_detector.SUPER_CLOSE_THRESHOLD)) &  (
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_OPEN.value].bool()))
 
@@ -735,19 +736,20 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             2* torch.exp(-100 * dist_grp2_tgt) ,
                             rewards[:, Phases.REACH_OBJ_GRIP.value] )
         
-        dist_gripper_tgt = torch.norm(gripper_link_tgt - gripper_link_pos, dim=-1)
-        rewards[:, Phases.REACH_OBJ_GRIP.value] += torch.where(
-                            self.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value],
-                            2* torch.exp(-100 * dist_gripper_tgt) ,
-                            rewards[:, Phases.REACH_OBJ_GRIP.value] )
+        # dist_gripper_tgt = torch.norm(gripper_link_tgt - gripper_link_pos, dim=-1)
+        # rewards[:, Phases.REACH_OBJ_GRIP.value] += torch.where(
+        #                     self.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value],
+        #                     2* torch.exp(-100 * dist_gripper_tgt) ,
+        #                     rewards[:, Phases.REACH_OBJ_GRIP.value] )
 
         #rewards[:, Phases.REACH_OBJ_GRIP.value] += 2* torch.exp(-100 * dist_obj_grip_ee1)
 
 
 
         mask_grip = ((dist_grp1_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & 
-                     (dist_grp2_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) &
-                     (dist_gripper_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD)) & ( 
+                     (dist_grp2_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) 
+                     #(dist_gripper_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD)
+                     ) & ( 
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ_GRIP.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE.value].bool()))
 
@@ -882,9 +884,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         new_pos = self.scene.env_origins[env_ids] + pos_noise
         
-        # new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
+        new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
         # new_rot[0] = torch.tensor([0.7071, 0, 0, 0.7071])
-        new_rot = torch.tensor([0.7071, 0, 0, 0.7071], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
+        #new_rot = torch.tensor([0.7071, 0, 0, 0.7071], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
 
         self.num_hand_dofs = self.robot_1.num_joints
