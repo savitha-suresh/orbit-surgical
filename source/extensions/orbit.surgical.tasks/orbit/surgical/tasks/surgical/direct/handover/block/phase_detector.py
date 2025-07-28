@@ -215,16 +215,16 @@ class PhaseDetector:
 
 
         # # # PHASE 3: LIFT
-        # phase_mask[:, Phases.LIFT.value] = (
-        #     (grp1_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) & 
-        #     (grp2_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) &
-        #     (~obj_above_ground) &
-        #     (gripper_width < 0.1) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
-        # )
+        phase_mask[:, Phases.LIFT.value] = (
+            (grp1_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) &
+            (~obj_above_ground) &
+            (gripper_width < 0.1) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
+        )
 
-        # # # # PHASE 4: REACH_GOAL_1
+        # # # PHASE 4: REACH_GOAL_1
         # phase_mask[:, Phases.REACH_GOAL_1.value] = (
-        #     robot_1_holding &
+            
         #     obj_above_ground &
         #     (ee1_goal_dist > self.FAR_THRESHOLD)
         # )
