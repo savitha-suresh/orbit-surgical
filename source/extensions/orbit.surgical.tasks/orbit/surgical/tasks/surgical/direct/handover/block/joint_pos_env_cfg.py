@@ -61,13 +61,13 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
         )
         self.actions.finger_1_joint_pos = mdp.BinaryJointPositionActionCfg(
             asset_name="robot_1",
-            joint_names=["psm_tool_gripper.*_joint"],
+            joint_names=["psm_tool_gripper1_joint", "psm_tool_gripper2_joint"],
             open_command_expr={"psm_tool_gripper1_joint": -0.5, "psm_tool_gripper2_joint": 0.5},
             close_command_expr={"psm_tool_gripper1_joint": -0.07, "psm_tool_gripper2_joint": 0.07},
         )
         self.actions.finger_2_joint_pos = mdp.BinaryJointPositionActionCfg(
             asset_name="robot_2",
-            joint_names=["psm_tool_gripper.*_joint"],
+            joint_names=["psm_tool_gripper1_joint", "psm_tool_gripper2_joint"],
             open_command_expr={"psm_tool_gripper1_joint": -0.5, "psm_tool_gripper2_joint": 0.5},
             close_command_expr={"psm_tool_gripper1_joint": -0.07, "psm_tool_gripper2_joint": 0.07},
         )
