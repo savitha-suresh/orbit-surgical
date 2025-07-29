@@ -4,7 +4,7 @@ from isaaclab.envs import DirectMARLEnv
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.utils.math import sample_uniform, quat_from_angle_axis, quat_mul, saturate
 
-from isaaclab.utils.math import subtract_frame_transforms
+from isaaclab.utils.math import subtract_frame_transforms, quat_rotate
 
 from .joint_pos_env_cfg import BlockHandoverEnvCfg
 from .phase_detector import Phases, PhaseDetector, log_if
@@ -131,7 +131,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         goal_pos = self.get_goal_pos(obj_pos)
         self.markers_goal.visualize(goal_pos)
         self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
-        self.grip_tgt_marker.visualize(self.get_gripper_link_target_pos())
+        self.grip_tgt_marker.visualize(self.get_obj_griplnk_tgt_pos())
         self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
         grip_pos = self.get_gripper_tip_positions(self.robot_1)
         
@@ -443,9 +443,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
             current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
             
             # Set high position gains for immediate response
-            self.robot_1.set_joint_position_target(
-                current_targets[grip_envs[:, None], gripper_dof_idxs],
-                env_ids=grip_envs, joint_ids=gripper_dof_idxs)
+            # self.robot_1.set_joint_position_target(
+            #     current_targets[grip_envs[:, None], gripper_dof_idxs],
+            #     env_ids=grip_envs, joint_ids=gripper_dof_idxs)
             
             # Option 2: Set velocity directly for controlled closure
             # current_velocities = self.robot_1.data.joint_vel_target.clone()
@@ -513,13 +513,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return self.current_phases, phase_indices, phase_regressed_mask, phase_same_mask
 
     def _get_obj_pos(self):
-        #return self.object.data.root_pos_w - self.scene.env_origin
-        pos_all = self.object.data.root_pos_w
-        pos_new = pos_all.clone()
-        pos_new[:, 2] += 0.02
-        pos_new[:, 0] += 0.008
-        pos_new[:, 1] -= 0.004
-        return  pos_new
+        base_pos = self.object.data.root_pos_w         # (N, 3)
+        base_rot = self.object.data.root_quat_w         # (N, 4)
+        
+        local_offset = torch.tensor([[0.008, -0.004, 0.02]], device=base_pos.device)  # (1, 3)
+        rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
+        
+        offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+        return base_pos + offset_world
     
 
     def get_dist_toadjust_griplink(self):
@@ -527,19 +528,41 @@ class DualArmHandoverEnv(DirectMARLEnv):
         ee_1 = self._get_ee_position(self.robot_1)
         return torch.norm(gripper_link_pos - ee_1, dim=-1)
     
+    
     def get_obj_griplnk_tgt_pos(self):
-        obj_grip_pos = self._get_obj_pos()
-        pos_new = obj_grip_pos.clone()
-        pos_new[:, 2] += self.get_dist_toadjust_griplink() # calculated by printing the distance
-        return pos_new
+        # Get base grip point (already rotation-aware)
+        grip_pos = self._get_obj_pos()
+
+        # Get object orientation
+        base_rot = self.object.data.root_quat_w         # (N, 4)
+        rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
+        z_axis = rot_mat[:, :, 2]                      # Object's local Z in world
+
+        # Get vertical offset based on gripper
+        dist_offset = self.get_dist_toadjust_griplink()  # (N,)
+        grip_pos_adjusted = grip_pos + z_axis * dist_offset.unsqueeze(-1)
+
+        return grip_pos_adjusted
     
     def get_obj_grip_pos(self):
-        pos_all = self.object.data.root_pos_w
-        pos_new = pos_all.clone()
-        pos_new[:, 2] -= 0.003
-        pos_new[:, 0] += 0.01
-        pos_new[:, 1] -= 0.004
-        return  pos_new
+        base_pos = self.object.data.root_pos_w          # (N, 3)
+        base_rot = self.object.data.root_quat_w          # (N, 4)
+        local_offset = torch.tensor([[0.008, -0.004, -0.003]], device=base_pos.device)  # (1, 3)
+
+        # Convert quaternion to rotation matrix
+        rot_mat = quat_to_matrix(base_rot)              # (N, 3, 3)
+
+        # Apply offset in object local frame
+        offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+
+        # Add to base pos
+        return base_pos + offset_world
+
+    def get_obj_rotation(self):
+        # Assuming self.peg is your RigidObject instance
+        # The quaternion is stored in the root_quat_w (world frame)
+        obj_quat = self.object.data.root_quat_w  # Shape: (num_envs, 4) - [x, y, z, w]
+        return obj_quat
     
     def get_gripper_tip_positions(self, robot, jaw_radius=0.01):
         # 1. Get gripper displacements
@@ -559,7 +582,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         gr1_tip_pos = tip_pos + x_axis * jaw_disp[:, 0:1]
         gr2_tip_pos = tip_pos + x_axis * jaw_disp[:, 1:2]
 
-        return gr1_tip_pos, gr2_tip_pos
+        return gr2_tip_pos, gr1_tip_pos
         
 
     def get_grp_tgt_distance(self, robot):
@@ -570,13 +593,25 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_gripper_target_points(self):
         displacement = 0.5
         jaw_radius = 0.01
-        direction = torch.tensor([[0.0, 1.0, 0.0]], device='cuda')
-        direction = torch.nn.functional.normalize(direction, dim=-1)  # ensure unit
-        grip_pt = self.get_obj_grip_pos()
         world_disp = displacement * jaw_radius
+        
+        grip_pt = self.get_obj_grip_pos()
+        obj_quat = self.get_obj_rotation()
+        peg_rot_mat = quat_to_matrix(obj_quat)         # (N, 3, 3)
+
+    #   
+        direction = peg_rot_mat[:, :, 1]  # (N, 3)
+
+        # 3. Offset gripper points
         grip1 = grip_pt - world_disp * direction
         grip2 = grip_pt + world_disp * direction
+
         return grip1, grip2
+
+        # world_disp = displacement * jaw_radius
+        # grip1 = grip_pt - world_disp * direction
+        # grip2 = grip_pt + world_disp * direction
+        # return grip1, grip2
     
     def get_gripper_link_target_pos(self):
         obj_grip_pos = self.get_obj_grip_pos()
