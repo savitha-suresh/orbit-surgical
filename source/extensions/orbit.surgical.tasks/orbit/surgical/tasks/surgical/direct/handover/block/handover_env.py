@@ -581,12 +581,11 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         # 4. Gripper opening is along local Y axis
         x_axis = tip_rot_mat[:, :, 0]                       # local X axis
-
+        
         # Only use joint displacement, no jaw_length added
         gr1_tip_pos = tip_pos + x_axis * jaw_disp[:, 0:1]
         gr2_tip_pos = tip_pos + x_axis * jaw_disp[:, 1:2]
-
-        return gr2_tip_pos, gr1_tip_pos
+        return gr1_tip_pos, gr2_tip_pos
         
 
     def get_grp_tgt_distance(self, robot):
@@ -607,9 +606,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         direction = peg_rot_mat[:, :, 1]  # (N, 3)
 
         # 3. Offset gripper points
-        grip1 = grip_pt - world_disp * direction
-        grip2 = grip_pt + world_disp * direction
-
+        grip1 = grip_pt + world_disp * direction
+        grip2 = grip_pt - world_disp * direction
+        
         return grip1, grip2
 
         # world_disp = displacement * jaw_radius

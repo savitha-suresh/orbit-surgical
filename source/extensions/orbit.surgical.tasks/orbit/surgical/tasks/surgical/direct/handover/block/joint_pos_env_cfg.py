@@ -142,6 +142,6 @@ class BlockHandoverEnvCfg_PLAY(BlockHandoverEnvCfg):
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
         self.is_training = False
-        self.episode_length_s = 5
+        self.episode_length_s = 15
         # disable randomization for play
         #self.observations.policy.enable_corruption = False
