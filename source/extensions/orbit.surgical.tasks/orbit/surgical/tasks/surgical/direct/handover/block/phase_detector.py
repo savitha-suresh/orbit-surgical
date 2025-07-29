@@ -44,7 +44,7 @@ class PhaseDetector:
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
         self.GRIP_CLOSE_THRESHOLD = 0.005
-        self.GRIP_WIDTH = 1
+        self.GRIP_WIDTH = 0.8
         
     def _get_ee_position(self, robot):
         ee_pos = robot.data.body_pos_w[:, robot.find_bodies(self.cfg.ee_link_name)[0]]
