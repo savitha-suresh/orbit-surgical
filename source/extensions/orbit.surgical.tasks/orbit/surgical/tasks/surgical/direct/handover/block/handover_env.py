@@ -443,9 +443,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
             current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
             
             # Set high position gains for immediate response
-            # self.robot_1.set_joint_position_target(
-            #     current_targets[grip_envs[:, None], gripper_dof_idxs],
-            #     env_ids=grip_envs, joint_ids=gripper_dof_idxs)
+            self.robot_1.set_joint_position_target(
+                current_targets[grip_envs[:, None], gripper_dof_idxs],
+                env_ids=grip_envs, joint_ids=gripper_dof_idxs)
             
             # Option 2: Set velocity directly for controlled closure
             # current_velocities = self.robot_1.data.joint_vel_target.clone()
@@ -517,6 +517,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_rot = self.object.data.root_quat_w         # (N, 4)
         
         local_offset = torch.tensor([[0.008, -0.004, 0.02]], device=base_pos.device)  # (1, 3)
+        N = base_pos.shape[0]
+        local_offset = local_offset.expand(N, -1) 
         rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
         
         offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
@@ -548,6 +550,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w          # (N, 3)
         base_rot = self.object.data.root_quat_w          # (N, 4)
         local_offset = torch.tensor([[0.008, -0.004, -0.003]], device=base_pos.device)  # (1, 3)
+        N = base_pos.shape[0]
+        local_offset = local_offset.expand(N, -1)
 
         # Convert quaternion to rotation matrix
         rot_mat = quat_to_matrix(base_rot)              # (N, 3, 3)
