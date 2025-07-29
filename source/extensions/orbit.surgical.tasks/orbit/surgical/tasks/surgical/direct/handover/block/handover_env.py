@@ -605,8 +605,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         direction = peg_rot_mat[:, :, 1]  # (N, 3)
 
         # 3. Offset gripper points
-        grip1 = grip_pt - world_disp * direction
-        grip2 = grip_pt + world_disp * direction
+        grip1 = grip_pt + world_disp * direction
+        grip2 = grip_pt - world_disp * direction
         
         return grip1, grip2
 
