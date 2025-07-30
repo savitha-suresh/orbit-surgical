@@ -72,18 +72,18 @@ class EventCfg:
         },
     )
 
-    # object_physics_material = EventTerm(
-    #     func=mdp.randomize_rigid_body_material,
-    #     min_step_count_between_reset=720,
-    #     mode="reset",
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("object"),
-    #         "static_friction_range": (0.7, 1.3),
-    #         "dynamic_friction_range": (1.0, 1.0),
-    #         "restitution_range": (1.0, 1.0),
-    #         "num_buckets": 250,
-    #     },
-    # )
+    object_physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        min_step_count_between_reset=720,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("object"),
+            "static_friction_range": (0.7, 1.3),
+            "dynamic_friction_range": (1.0, 1.0),
+            "restitution_range": (1.0, 1.0),
+            "num_buckets": 250,
+        },
+    )
     object_scale_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
         min_step_count_between_reset=720,
