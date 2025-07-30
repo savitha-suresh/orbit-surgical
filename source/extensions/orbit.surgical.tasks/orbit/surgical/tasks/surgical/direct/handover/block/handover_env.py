@@ -645,17 +645,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         """
         Create P1 at 45-degree approach angle
         """
-        angle_rad = torch.deg2rad(torch.tensor(approach_angle))
+        # angle_rad = torch.deg2rad(torch.tensor(approach_angle))
         
-        # Distance from object (adjust this based on your needs)
-        approach_distance = 0.03  # 5cm approach distance
+        # # Distance from object (adjust this based on your needs)
+        # approach_distance = 0.03  # 5cm approach distance
         
-        # Calculate P1 position at 45-degree angle
-        p1_pos = obj_position.clone()
-        p1_pos[:, 0] += approach_distance * torch.cos(angle_rad)  # X offset
-        p1_pos[:, 2] += approach_distance * torch.sin(angle_rad)  # Z offset (height)
+        num_envs = obj_position.shape[0]
+        goal_position = torch.tensor([[-0.02, 0.02, 0.04]], device=obj_position.device)  # shape (1, 3)
+        goal_position = goal_position.expand(num_envs, -1)   
         
-        return p1_pos
+        return goal_position
     
     
     def _get_r2_stationary_rew(self, env_id):
@@ -805,7 +804,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
 
 
-        mask_close = (gripper_width < 0.1) & (
+        mask_close = (gripper_width < 0.15) & (
                         self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value] 
                             & ~self.not_visited_mask[env_ids, Phases.REACH_OBJ.value]) & (
                                 phases_one_hot[env_ids, Phases.LIFT.value].bool()

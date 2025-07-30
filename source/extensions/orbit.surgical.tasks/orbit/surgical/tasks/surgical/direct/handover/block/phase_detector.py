@@ -228,11 +228,11 @@ class PhaseDetector:
         )
 
         # # # PHASE 4: REACH_GOAL_1
-        # phase_mask[:, Phases.REACH_GOAL_1.value] = (
+        phase_mask[:, Phases.REACH_GOAL_1.value] = (
             
-        #     obj_above_ground &
-        #     (ee1_goal_dist > self.FAR_THRESHOLD)
-        # )
+            obj_above_ground &
+            (ee1_goal_dist > self.FAR_THRESHOLD)
+        )
 
         # # PHASE 5: REACH_GOAL_2
         # phase_mask[:, Phases.REACH_GOAL_2.value] = (
