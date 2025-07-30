@@ -43,7 +43,7 @@ class PhaseDetector:
         self.SUPER_CLOSE_THRESHOLD = 0.005  # 2cm
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
-        self.GRIP_CLOSE_THRESHOLD = 0.008
+        self.GRIP_CLOSE_THRESHOLD = 0.005
         self.GRIP_WIDTH = 0.8
         
     def _get_ee_position(self, robot):
@@ -143,7 +143,7 @@ class PhaseDetector:
         grp_tgt_dist = self.env.get_grp_tgt_distance(robot_1)
         grp1_tgt_dist = grp_tgt_dist[0]
         grp2_tgt_dist = grp_tgt_dist[1]
-        log_if(not self.cfg.is_training, f"gripper_link_to tgt {grip_link_tgt_dist}")
+        #log_if(not self.cfg.is_training, f"gripper_link_to tgt {grip_link_tgt_dist}")
         num_envs = batch_size
         num_phases = len(Phases)
         device = ee_1_pos.device
