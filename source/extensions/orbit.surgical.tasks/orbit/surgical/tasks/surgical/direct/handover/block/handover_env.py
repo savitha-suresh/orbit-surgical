@@ -378,11 +378,11 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
         base_scale = 0.19
-        reduced_scale = 0.1
+        reduced_scale = 0.12
         action_scale = torch.full((self.num_envs, 1), base_scale, device=self.device)
 
         # Check if GRIP_OPEN phase is active (1 or True)
-        grip_open_active = self.current_phases[:, Phases.REACH_OBJ_GRIP.value].bool() | self.current_phases[:, Phases.GRIP_1_CLOSE.value].bool()
+        grip_open_active = ~self.not_visited_mask[:, Phases.GRIP_1_OPEN.value]
         lift_active = self.current_phases[:, Phases.LIFT.value].bool()
         # Apply reduced scale where grip is open
         action_scale[grip_open_active] = reduced_scale
@@ -439,13 +439,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # Copy over previous targets for gripper-close envs
         if grip_envs.numel() > 0:
             closed_position = 0.0  # or whatever your closed position should be
-            current_targets = self.robot_1.data.joint_pos_target.clone()
-            current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
+            #current_targets = self.robot_1.data.joint_pos_target.clone()
+            self.robot_1_curr_targets[grip_envs[:, None], -1] = 0.07
+            self.robot_1_curr_targets[grip_envs[:, None], -2] = -0.07
+            #current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
+            
             
             # Set high position gains for immediate response
             self.robot_1.set_joint_position_target(
-                current_targets[grip_envs[:, None], gripper_dof_idxs],
-                env_ids=grip_envs, joint_ids=gripper_dof_idxs)
+                self.robot_1_curr_targets[grip_envs[:, None], self.actuated_dof_indices],
+                env_ids=grip_envs, joint_ids=self.actuated_dof_indices)
             
             # Option 2: Set velocity directly for controlled closure
             # current_velocities = self.robot_1.data.joint_vel_target.clone()

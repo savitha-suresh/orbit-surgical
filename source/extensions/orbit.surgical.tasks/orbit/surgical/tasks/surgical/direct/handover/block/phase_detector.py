@@ -43,7 +43,7 @@ class PhaseDetector:
         self.SUPER_CLOSE_THRESHOLD = 0.005  # 2cm
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
-        self.GRIP_CLOSE_THRESHOLD = 0.008
+        self.GRIP_CLOSE_THRESHOLD = 0.005
         self.GRIP_WIDTH = 0.8
         
     def _get_ee_position(self, robot):
@@ -196,8 +196,15 @@ class PhaseDetector:
         # PHASE 2: GRIP_1_CLOSE
         phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
             
-                (grp1_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) & 
-                (grp2_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) &
+                (  (
+                    (grp1_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) & 
+                    (grp2_tgt_dist <= self.GRIP_CLOSE_THRESHOLD)) |
+                    (
+                    (((grp1_tgt_dist < 0.01) & (prev_phases[:, Phases.GRIP_1_CLOSE.value])) & 
+                    ((grp2_tgt_dist < 0.01) & ((prev_phases[:, Phases.GRIP_1_CLOSE.value]))))
+
+                    )
+                )&
                 #(grip_link_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) &
             (~obj_above_ground) &
             (
@@ -206,7 +213,7 @@ class PhaseDetector:
                     (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN.value])
                 ) |
                 (
-                    (gripper_width >= 0.1) &
+                    (gripper_width >= 0.15) &
                     (prev_phases[:, Phases.GRIP_1_CLOSE.value])
                 )
             ) &
@@ -216,10 +223,8 @@ class PhaseDetector:
 
         # # # PHASE 3: LIFT
         phase_mask[:, Phases.LIFT.value] = (
-            (grp1_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) & 
-            (grp2_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) &
             (~obj_above_ground) &
-            (gripper_width < 0.1) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
+            (gripper_width < 0.15) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
         )
 
         # # # PHASE 4: REACH_GOAL_1
