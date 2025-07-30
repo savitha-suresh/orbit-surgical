@@ -608,7 +608,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         grip1 = grip_pt + world_disp * direction
         grip2 = grip_pt - world_disp * direction
         
-        return grip1, grip2
+        return grip2, grip1
 
         # world_disp = displacement * jaw_radius
         # grip1 = grip_pt - world_disp * direction
