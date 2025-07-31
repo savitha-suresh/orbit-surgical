@@ -226,7 +226,7 @@ class PhaseDetector:
 
             (
                     (grp1_tgt_dist < 0.005) & 
-                    (grp2_tgt_dist < 0.008))
+                    (grp2_tgt_dist < 0.008)) & 
             (~obj_above_ground) &
             (gripper_width < 0.15) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
         )
