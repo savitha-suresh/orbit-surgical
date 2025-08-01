@@ -173,7 +173,7 @@ class PhaseDetector:
 
        # PHASE 1: GRIP_1_OPEN
         phase_mask[:, Phases.GRIP_1_OPEN.value] = (
-            (ee1_obj_dist <= self.GRIP_THRESHOLD) &
+            (ee1_obj_dist <= self.SUPER_CLOSE_THRESHOLD) &
             (obj_grip_link_tg_dist <= 0.015) & 
             (gripper_width < self.GRIP_WIDTH) &
             (~obj_above_ground) &
@@ -181,7 +181,9 @@ class PhaseDetector:
         )
 
         phase_mask[:, Phases.REACH_OBJ_GRIP.value] = (
-            ((ee1_obj_dist <= self.GRIP_THRESHOLD)) & 
+            ((ee1_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
+             | (ee1_obj_dist <= 0.025) & ((prev_phases[:, Phases.REACH_OBJ_GRIP.value]))
+             ) & 
             ((gripper_width >= self.GRIP_WIDTH)) &
             (~obj_above_ground) &
             ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value] & 
@@ -235,7 +237,7 @@ class PhaseDetector:
         phase_mask[:, Phases.REACH_GOAL_1.value] = (
             
             obj_above_ground &
-            (ee1_goal_dist > self.CLOSE_THRESHOLD)
+            (ee1_goal_dist > self.CLOSE_THRESHOLD) &  ~self.env.not_visited_mask[:, Phases.GRIP_1_CLOSE.value]
         )
 
         # # PHASE 5: REACH_GOAL_2

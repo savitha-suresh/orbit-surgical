@@ -754,7 +754,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             rewards[:, Phases.GRIP_1_OPEN.value] )
         #rewards[:, Phases.GRIP_1_OPEN.value] +=  gripper_width * 2
 
-        mask_open = (dist_obj_ee <= self.phase_detector.GRIP_THRESHOLD) & (
+        mask_open = (dist_obj_ee <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & (
                     ~self.phase_detector.is_gripper_closed(self.robot_1) & 
                     self.not_visited_mask[env_ids, Phases.GRIP_1_OPEN.value] & 
                     (phases_one_hot[env_ids, Phases.REACH_OBJ_GRIP.value].bool()))
@@ -836,7 +836,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards[mask_reach1, Phases.REACH_GOAL_1.value] += 2000
 
         dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
-        rewards[:, Phases.REACH_GOAL_1.value] = 2 * torch.exp(-50 * dist_goal1)
+        rewards[:, Phases.REACH_GOAL_1.value] += 2 * torch.exp(-50 * dist_goal1)
 
         # phase 5: REACH_GOAL_2
         dist_goal2 = torch.norm(goal_pos - ee_2, dim=-1)
