@@ -87,14 +87,14 @@ class PhaseDetector:
         
         return is_closed
     
-    def is_holding_object(self, obj_position, robot):
-        return self._is_holding_object(obj_position, robot)
+    def is_holding_object(self, robot):
+        return self._is_holding_object(robot)
     
 
     
-    def _is_holding_object(self, obj_position, robot):
+    def _is_holding_object(self, robot):
         """Check if robot is holding the object"""
-        
+        obj_position = self.env.get_abs_obj_pos()
         ee_position = self._get_ee_position(robot)
         gripper_closed = self.is_gripper_closed(robot)
         
@@ -105,9 +105,10 @@ class PhaseDetector:
         return is_holding
     
     
-    def is_object_above_ground(self, obj_position, ground_height=0.0149):
+    def is_object_above_ground(self):
         """Check if object is above ground"""
         ground_height = self.cfg.ground_height
+        obj_position = self.env.get_abs_obj_pos()
         return obj_position[:, 2] > 0.04  # 1cm above ground
     
     def _get_distance(self, pos1, pos2):
@@ -128,10 +129,10 @@ class PhaseDetector:
         #print("prev_phases", prev_phases)
         gripper_1_closed = self.is_gripper_closed(robot_1)  # (num_envs,)
         gripper_2_closed = self.is_gripper_closed(robot_2)  # (num_envs,)
-        robot_1_holding = self._is_holding_object(obj_position, robot_1)  # (num_envs,)
-        robot_2_holding = self._is_holding_object(obj_position, robot_2)  # (num_envs,)
+        robot_1_holding = self._is_holding_object(robot_1)  # (num_envs,)
+        robot_2_holding = self._is_holding_object(robot_2)  # (num_envs,)
         gripper_width = self.get_gripper_width(robot_1)
-        obj_above_ground = self.is_object_above_ground(obj_position)      # (num_envs,)
+        obj_above_ground = self.is_object_above_ground()      # (num_envs,)
         p1_pos = self.env.get_p1_pos(obj_position)
         ee1_p1_dist = self._get_distance(ee_1_pos, p1_pos)
         ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)

@@ -515,6 +515,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.phase_regressed_mask = phase_regressed_mask
         return self.current_phases, phase_indices, phase_regressed_mask, phase_same_mask
 
+    def get_abs_obj_pos(self):
+        return self.object.data.root_pos_w
+    
     def _get_obj_pos(self):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w         # (N, 4)
@@ -688,6 +691,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         num_envs, num_phases = phases_one_hot.shape
         device = self.robot_1.data.device
         obj_pos = self._get_obj_pos()  # (num_envs, 3)
+        obj_abs_pos = self.get_abs_obj_pos()
         ee_1 = self._get_ee_position(self.robot_1)
         ee_2 = self._get_ee_position(self.robot_2)
         p1_pos = self.get_p1_pos(obj_pos)
@@ -815,17 +819,17 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards[mask_close, Phases.LIFT.value] += 2000
 
         # phase 3: LIFT
-        height = obj_pos[:, 2] - self.cfg.ground_height
+        height = obj_abs_pos[:, 2] - self.cfg.ground_height
         rewards[:, Phases.LIFT.value] += torch.where(
                             self.not_visited_mask[:, Phases.LIFT.value],
                             2*height ,
                             rewards[:, Phases.LIFT.value] )
         #rewards[:, Phases.LIFT.value] += 10*height
 
-        log_if(not self.cfg.is_training, f"obj_pos z {obj_pos[:, 2]} height {height}")
+        log_if(not self.cfg.is_training, f"obj_pos z {obj_abs_pos[:, 2]} height {height}")
 
         # phase 4: REACH_GOAL_1
-        mask_reach1 = self.phase_detector.is_object_above_ground(obj_pos) & (
+        mask_reach1 = self.phase_detector.is_object_above_ground() & (
                         self.not_visited_mask[env_ids, Phases.LIFT.value] 
                             & ~self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value]) & (
                                 phases_one_hot[env_ids, Phases.REACH_GOAL_1.value].bool()
@@ -843,11 +847,11 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards[:, Phases.REACH_GOAL_2.value] = torch.exp(-self.cfg.dist_reward_scale * dist_goal2)
 
         # phase 6: GRIP_2
-        holding_2 = self.phase_detector.is_holding_object(obj_pos, self.robot_2)
+        holding_2 = self.phase_detector.is_holding_object(self.robot_2)
         rewards[:, Phases.GRIP_2.value] = 10 * holding_2.float()
 
         # phase 7: RELEASE_1
-        holding_1 = self.phase_detector.is_holding_object(obj_pos, self.robot_1)
+        holding_1 = self.phase_detector.is_holding_object(self.robot_1)
         both_condition = (~holding_1) & holding_2
         rewards[:, Phases.RELEASE_1.value] = 10 * both_condition.float()
 
@@ -925,7 +929,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
         # new_rot[0] = torch.tensor([0.7071, 0, 0, 0.7071])
-        #new_rot = torch.tensor([0.7071, 0, 0, 0.7071], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
+        #new_rot = torch.tensor([0.707, 0.707, 0, 0], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
 
         self.num_hand_dofs = self.robot_1.num_joints
