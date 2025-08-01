@@ -109,7 +109,7 @@ class PhaseDetector:
         """Check if object is above ground"""
         ground_height = self.cfg.ground_height
         obj_position = self.env.get_abs_obj_pos()
-        return obj_position[:, 2] > 0.04  # 1cm above ground
+        return obj_position[:, 2] > 0.02  # 1cm above ground
     
     def _get_distance(self, pos1, pos2):
         """Calculate Euclidean distance between two positions"""
