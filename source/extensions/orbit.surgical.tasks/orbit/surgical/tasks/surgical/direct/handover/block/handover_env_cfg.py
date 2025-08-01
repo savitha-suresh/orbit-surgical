@@ -173,36 +173,36 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
         "psm_tool_gripper2_joint",
     )
     # Simulation
-    sim: SimulationCfg = SimulationCfg(
-        dt=0.008,  # Your small timestep is good for precision
-        render_interval=2,
-        physics_material=RigidBodyMaterialCfg(
-            static_friction=0.7,   # Moderate global friction
-            dynamic_friction=0.5,  # Smooth global dynamics
-            restitution=0.0,       # No global bouncing
-        ),
-        physx=PhysxCfg(
-            bounce_threshold_velocity=0.0,  # CRITICAL: Disable all bouncing
+    # sim: SimulationCfg = SimulationCfg(
+    #     dt=0.008,  # Your small timestep is good for precision
+    #     render_interval=2,
+    #     physics_material=RigidBodyMaterialCfg(
+    #         static_friction=0.7,   # Moderate global friction
+    #         dynamic_friction=0.5,  # Smooth global dynamics
+    #         restitution=0.0,       # No global bouncing
+    #     ),
+    #     physx=PhysxCfg(
+    #         bounce_threshold_velocity=0.0,  # CRITICAL: Disable all bouncing
             
-            # Enhanced solver settings for small objects and precise contact
-            solver_type="pgs",  # Position-based solver
+    #         # Enhanced solver settings for small objects and precise contact
+    #         solver_type="pgs",  # Position-based solver
             
             
-            # GPU collision settings for better performance with small objects
-            gpu_max_rigid_contact_count=2**21,  # Increased for many contacts
-            gpu_max_rigid_patch_count=2**19,
-            gpu_found_lost_pairs_capacity=2**21,
-            gpu_collision_stack_size=2**27,
+    #         # GPU collision settings for better performance with small objects
+    #         gpu_max_rigid_contact_count=2**21,  # Increased for many contacts
+    #         gpu_max_rigid_patch_count=2**19,
+    #         gpu_found_lost_pairs_capacity=2**21,
+    #         gpu_collision_stack_size=2**27,
             
-            # Contact processing settings
-            gpu_heap_capacity=2**26,
-            gpu_temp_buffer_capacity=2**24,
+    #         # Contact processing settings
+    #         gpu_heap_capacity=2**26,
+    #         gpu_temp_buffer_capacity=2**24,
             
-            # Stability settings
-            enable_stabilization=True
+    #         # Stability settings
+    #         enable_stabilization=True
             
-        ),
-    )
+    #     ),
+    # )
 
     # Robots
 

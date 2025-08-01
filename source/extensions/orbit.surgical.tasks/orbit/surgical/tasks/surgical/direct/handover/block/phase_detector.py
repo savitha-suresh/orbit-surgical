@@ -165,7 +165,7 @@ class PhaseDetector:
                     self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos) &
                     (ee1_obj_dist > self.SUPER_CLOSE_THRESHOLD) &
                     ~self.env.not_visited_mask[:, Phases.REACH_P1.value] & 
-                    (obj_grip_link_tg_dist > self.SUPER_CLOSE_THRESHOLD)
+                    (obj_grip_link_tg_dist > self.CLOSE_THRESHOLD)
                 )
             )
             & (~obj_above_ground)
@@ -174,6 +174,7 @@ class PhaseDetector:
        # PHASE 1: GRIP_1_OPEN
         phase_mask[:, Phases.GRIP_1_OPEN.value] = (
             (ee1_obj_dist <= self.SUPER_CLOSE_THRESHOLD) & 
+            (obj_grip_link_tg_dist <= self.CLOSE_THRESHOLD)
             (obj_grip_link_tg_dist <= 0.015) & 
             (gripper_width < self.GRIP_WIDTH) &
             (~obj_above_ground) &
