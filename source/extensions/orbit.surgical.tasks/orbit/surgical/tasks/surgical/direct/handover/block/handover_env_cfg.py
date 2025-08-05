@@ -177,8 +177,8 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
         dt=0.008,  # Your small timestep is good for precision
         render_interval=2,
         physics_material=RigidBodyMaterialCfg(
-            static_friction=0.7,   # Moderate global friction
-            dynamic_friction=0.5,  # Smooth global dynamics
+            static_friction=11,   # Moderate global friction
+            dynamic_friction=9,  # Smooth global dynamics
             restitution=0.0,       # No global bouncing
         ),
         physx=PhysxCfg(
@@ -333,7 +333,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
         # general settings
         self.decimation = 2
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 7
+        self.episode_length_s = 5
         # simulation settings
         self.sim.dt = 0.01  # 100Hz
         self.viewer.eye = (0.0, 0.5, 0.2)
