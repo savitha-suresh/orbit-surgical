@@ -440,8 +440,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         if grip_envs.numel() > 0:
             closed_position = 0.0  # or whatever your closed position should be
             #current_targets = self.robot_1.data.joint_pos_target.clone()
-            self.robot_1_curr_targets[grip_envs[:, None], -1] = 0.1
-            self.robot_1_curr_targets[grip_envs[:, None], -2] = -0.1
+            self.robot_1_curr_targets[grip_envs[:, None], -1] = 0.07
+            self.robot_1_curr_targets[grip_envs[:, None], -2] = -0.07
             #current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
             
             

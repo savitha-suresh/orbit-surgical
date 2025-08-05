@@ -87,7 +87,7 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
                 solver_velocity_iteration_count=64,
                 max_angular_velocity=0.1,  # Allow natural movement
                 max_linear_velocity=0.1,   # Allow natural movement
-                max_depenetration_velocity=2,  # Higher to resolve penetration faster
+                max_depenetration_velocity=0.2,  # Higher to resolve penetration faster
                 disable_gravity=False,
                 linear_damping=0.2,  # Light damping to prevent bouncing
                 angular_damping=0.3,  # Light rotational damping
