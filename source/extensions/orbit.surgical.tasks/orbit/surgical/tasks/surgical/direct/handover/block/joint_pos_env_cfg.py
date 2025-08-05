@@ -83,11 +83,11 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
             usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block_backup.usda",
             scale=(0.011, 0.011, 0.011),
             rigid_props=RigidBodyPropertiesCfg(
-                solver_position_iteration_count=64,  # Higher for small objects
-                solver_velocity_iteration_count=32,
+                solver_position_iteration_count=128,  # Higher for small objects
+                solver_velocity_iteration_count=64,
                 max_angular_velocity=0.1,  # Allow natural movement
                 max_linear_velocity=0.1,   # Allow natural movement
-                max_depenetration_velocity=1,  # Higher to resolve penetration faster
+                max_depenetration_velocity=2,  # Higher to resolve penetration faster
                 disable_gravity=False,
                 linear_damping=0.2,  # Light damping to prevent bouncing
                 angular_damping=0.3,  # Light rotational damping
