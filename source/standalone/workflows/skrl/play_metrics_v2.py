@@ -431,7 +431,7 @@ def main():
                 current_not_visited_mask = env.unwrapped.not_visited_mask.cpu()
                 metrics.update_phase_data(current_not_visited_mask, timestep)
             
-                current_obj_positions = env.unwrapped._get_obj_pos().cpu()
+                current_obj_positions = env.unwrapped.get_abs_obj_pos().cpu()
                 metrics.update_height_data(current_obj_positions, timestep)
             
                 # Store final states for environments that just finished
