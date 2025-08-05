@@ -654,10 +654,11 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # approach_distance = 0.03  # 5cm approach distance
         
         num_envs = obj_position.shape[0]
-        goal_position = torch.tensor([[-0.02, 0.02, 0.04]], device=obj_position.device)  # shape (1, 3)
-        goal_position = goal_position.expand(num_envs, -1)   
+        goal_position = torch.tensor([-0.02, 0.02, 0.04], device=obj_position.device).unsqueeze(0)  # shape (1, 3)
+        goal_position = goal_position + self.scene.env_origins  # shape (num_envs, 3)
+        return goal_position 
         
-        return goal_position
+        
     
     
     def _get_r2_stationary_rew(self, env_id):
