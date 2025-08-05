@@ -507,7 +507,7 @@ def main():
     print(f"\n[INFO] Phase Success Rates (mean ± std):")
     for phase, stats in overall_summary['phase_success_rates'].items():
         print(f"  - {phase}: {stats['rate']:.2}")
-    print(f"\n[INFO] Height Success Rate: {overall_summary['height_success_rate']['rate']:.2}")
+    #print(f"\n[INFO] Height Success Rate: {overall_summary['height_success_rate']['rate']:.2}")
     print(f"\n[INFO] Obj Drop Rate: {overall_summary['obj_drop_count_rate']['rate']:.2}")
     print(f"\n[INFO] Average Episode Length: {overall_summary['episode_length_stats']['mean']:.2f} ± {overall_summary['episode_length_stats']['std']:.2f}")
     print(f"[INFO] Average Reward: {overall_summary['reward_stats']['mean']:.2f} ± {overall_summary['reward_stats']['std']:.2f}")
