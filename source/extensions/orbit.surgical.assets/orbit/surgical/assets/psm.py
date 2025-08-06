@@ -66,7 +66,7 @@ PSM_CFG = ArticulationCfg(
         ),
         "psm_tool": ImplicitActuatorCfg(
             joint_names_expr=["psm_tool_gripper.*"],
-            effort_limit=5,
+            effort_limit=10,
             velocity_limit=0.2,
             stiffness=1000,
             damping=80,
