@@ -1398,7 +1398,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         x_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
         y_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
-        z_noise = sample_uniform(0, 0.01, (len(env_ids), 1), self.device)
+        z_noise = sample_uniform(0, 0.001, (len(env_ids), 1), self.device)
 
         pos_noise = torch.cat([x_noise, y_noise, z_noise], dim=1)
         rot_noise = self.cfg.reset_rot_noise * sample_uniform(-1, 1, (len(env_ids), 2), self.device)
