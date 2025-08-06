@@ -77,30 +77,21 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
 
         # Set Peg Block as object
         self.scene.object = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Object",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.05), rot=(1, 0, 0, 0)),
-        spawn=UsdFileCfg(
-            usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_block/block_backup.usda",
-            scale=(0.011, 0.011, 0.011),
-            rigid_props=RigidBodyPropertiesCfg(
-                solver_position_iteration_count=128,  # Higher for small objects
-                solver_velocity_iteration_count=64,
-                max_angular_velocity=0.1,  # Allow natural movement
-                max_linear_velocity=0.1,   # Allow natural movement
-                max_depenetration_velocity=2,  # Higher to resolve penetration faster
-                disable_gravity=False,
-                linear_damping=0.2,  # Light damping to prevent bouncing
-                angular_damping=0.3,  # Light rotational damping
+            prim_path="{ENV_REGEX_NS}/Object",
+            init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, 0.015), rot=(0, 0, 1, 0)),
+            spawn=UsdFileCfg(
+                usd_path=f"{ORBITSURGICAL_ASSETS_DATA_DIR}/Props/Surgical_needle/needle_sdf.usd",
+                scale=(0.4, 0.4, 0.4),
+                rigid_props=RigidBodyPropertiesCfg(
+                    solver_position_iteration_count=16,
+                    solver_velocity_iteration_count=8,
+                    max_angular_velocity=0.1,
+                    max_linear_velocity=0.1,
+                    max_depenetration_velocity=1.0,
+                    disable_gravity=False,
+                ),
             ),
-            # Add physics material for the object
-            
-            # Add collision properties
-            collision_props=CollisionPropertiesCfg(
-                contact_offset=0.0015,  # Small but sufficient for tiny object
-                rest_offset=0.001,     # Very small rest offset
-            ),
-        ),
-    )
+        )
 
         # Listens to the required transforms
         marker_cfg = FRAME_MARKER_CFG.copy()

@@ -440,8 +440,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         if grip_envs.numel() > 0:
             closed_position = 0.0  # or whatever your closed position should be
             #current_targets = self.robot_1.data.joint_pos_target.clone()
-            self.robot_1_curr_targets[grip_envs[:, None], -1] = 0.04
-            self.robot_1_curr_targets[grip_envs[:, None], -2] = -0.04
+            self.robot_1_curr_targets[grip_envs[:, None], -1] = 0.07
+            self.robot_1_curr_targets[grip_envs[:, None], -2] = -0.07
             #current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
             
             
@@ -522,7 +522,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w         # (N, 4)
         
-        local_offset = torch.tensor([[0.008, -0.004, 0.02]], device=base_pos.device)  # (1, 3)
+        local_offset = torch.tensor([[-0.00012, 0.005, 0.02]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1) 
         rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
@@ -555,7 +555,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_grip_pos(self):
         base_pos = self.object.data.root_pos_w          # (N, 3)
         base_rot = self.object.data.root_quat_w          # (N, 4)
-        local_offset = torch.tensor([[0.008, -0.004, -0.003]], device=base_pos.device)  # (1, 3)
+        # x,y are for the needle
+        local_offset = torch.tensor([[-0.00012, 0.005, 0.003]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1)
 
@@ -608,13 +609,13 @@ class DualArmHandoverEnv(DirectMARLEnv):
         peg_rot_mat = quat_to_matrix(obj_quat)         # (N, 3, 3)
 
     #   
-        direction = peg_rot_mat[:, :, 1]  # (N, 3)
+        direction = peg_rot_mat[:, :, 0]  # (N, 3)
 
         # 3. Offset gripper points
         grip1 = grip_pt + world_disp * direction
         grip2 = grip_pt - world_disp * direction
         
-        return grip2, grip1
+        return grip1, grip2
 
         # world_disp = displacement * jaw_radius
         # grip1 = grip_pt - world_disp * direction
@@ -930,7 +931,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         new_rot = randomize_rotation(rot_noise[:, 0], rot_noise[:, 1])
         # new_rot[0] = torch.tensor([0.7071, 0, 0, 0.7071])
-        #new_rot = torch.tensor([0.707, 0.707, 0, 0], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
+        new_rot = torch.tensor([0.7071, 0, 0, -0.7071], device=self.device).unsqueeze(0).repeat(len(env_ids), 1)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
 
         self.num_hand_dofs = self.robot_1.num_joints
