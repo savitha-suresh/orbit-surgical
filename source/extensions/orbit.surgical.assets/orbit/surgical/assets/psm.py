@@ -60,9 +60,9 @@ PSM_CFG = ArticulationCfg(
                 "psm_tool_yaw_joint",
             ],
             effort_limit=20.0,
-            velocity_limit=0.001,
-            stiffness=200.0,
-            damping=100.0,
+            velocity_limit=0.01,
+            stiffness=400.0,
+            damping=80.0,
         ),
         "psm_tool": ImplicitActuatorCfg(
             joint_names_expr=["psm_tool_gripper.*"],
