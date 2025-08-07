@@ -308,6 +308,55 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
                     ),
                 },
             )
+    
+
+    tip_1_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.001,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((0.1, 0, 0))), #reddish
+                    ),
+                },
+            )
+    tip_2_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.001,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((1.0, 0.5, 0.0))), #yellow
+                    ),
+                },
+            )
+    
+    grp_pt_1_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.001,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((0.1, 0, 0))),
+                    ),
+                },
+            )
+    grp_pt_2_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.001,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((1.0, 0.5, 0.0))),
+                    ),
+                },
+            )
+    
+    ee_tgt_pos_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.003,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((0.9, 0.8, 0.9))),
+                    ),
+                },
+            )
 
     # Constants for logic (used in reward, reset, etc.)
     ee_link_name: str = "psm_tool_tip_link"

@@ -100,6 +100,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.tip_2_marker = VisualizationMarkers(self.cfg.tip_2_cfg)
         self.grp_pt_1_marker = VisualizationMarkers(self.cfg.grp_pt_1_cfg)
         self.grp_pt_2_marker = VisualizationMarkers(self.cfg.grp_pt_2_cfg)
+        self.tip_1_marker_r2 = VisualizationMarkers(self.cfg.tip_1_cfg_r2)
+        self.tip_2_marker_r2 = VisualizationMarkers(self.cfg.tip_2_cfg_r2)
+        self.grp_pt_1_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_1_cfg_r2)
+        self.grp_pt_2_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_2_cfg_r2)
+        self.ee_tgt_marker_r2 = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg_r2)
+
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
         self.hand_dof_upper_limits = joint_pos_limits[..., 1]
@@ -130,6 +136,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.goal_markers.visualize(p1_pos)
         goal_pos = self.get_goal_pos(obj_pos)
         self.markers_goal.visualize(goal_pos)
+
+
         self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
         self.grip_tgt_marker.visualize(self.get_obj_griplnk_tgt_pos())
         self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
@@ -140,6 +148,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         grip_end_pts = self.get_gripper_target_points()
         self.grp_pt_1_marker.visualize(grip_end_pts[0])
         self.grp_pt_2_marker.visualize(grip_end_pts[1])
+
+
+        self.ee_tgt_marker_r2.visualize(self.get_obj_grip_pos_r2())
+        grip_pos_r2 = self.get_gripper_tip_positions(self.robot_2)
+        
+        self.tip_1_marker_r2.visualize(grip_pos_r2[0])
+        self.tip_2_marker_r2.visualize(grip_pos_r2[1])
+        grip_end_pts_r2 = self.get_gripper_target_points_r2()
+        self.grp_pt_1_marker_r2.visualize(grip_end_pts_r2[0])
+        self.grp_pt_2_marker_r2.visualize(grip_end_pts_r2[1])
 
         
 
@@ -290,84 +308,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return observations
     
 
-    # def _apply_action(self):
 
-        
-        
-        
-        
-    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = scale(
-    #         self.actions["robot_1"],
-    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
-    #     )
-    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = (
-    #         self.cfg.act_moving_average * self.robot_1_curr_targets[:, self.actuated_dof_indices]
-    #         + (1.0 - self.cfg.act_moving_average) * self.robot_1_prev_targets[:, self.actuated_dof_indices]
-    #     )
-
-        
-    #     self.robot_1_curr_targets[:, self.actuated_dof_indices] = saturate(
-    #         self.robot_1_curr_targets[:, self.actuated_dof_indices],
-    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
-    #     )
-
-        
-    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = scale(
-    #         self.actions["robot_2"],
-    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
-    #     )
-    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
-    #         self.cfg.act_moving_average * self.robot_2_curr_targets[:, self.actuated_dof_indices]
-    #         + (1.0 - self.cfg.act_moving_average) * self.robot_2_prev_targets[:, self.actuated_dof_indices]
-    #     )
-    #     self.robot_2_curr_targets[:, self.actuated_dof_indices] = saturate(
-    #         self.robot_2_curr_targets[:, self.actuated_dof_indices],
-    #         self.hand_dof_lower_limits[:, self.actuated_dof_indices],
-    #         self.hand_dof_upper_limits[:, self.actuated_dof_indices],
-    #     )
-
-        
-
-    #     self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[
-    #         :, self.actuated_dof_indices
-    #     ]
-    #     self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[
-    #         :, self.actuated_dof_indices
-    #     ]
-    #     # self.robot_1.set_joint_position_target(
-    #     #     self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
-    #     # )
-
-    #     # self.count+=1
-       
-    #     # if self.count > 200:
-    #     #     print("increasing count")
-    #     #     self.robot_1_curr_targets[:, 2] += 0.16
-            
-            
-    #     # if self.count > 500:
-    #     #     print("beinding")
-    #     #     self.robot_1_curr_targets[:, 4] += -50
-        
-    #     self.robot_1.set_joint_position_target(
-    #         # 0. - Swings the arm side to side (base yaw) - X position of ee
-    #         # 1. - Moves the arm up/down (pitch motion) - Y axis moving ee
-    #         # 2. Length
-    #         # 3. Rolls instrument around tool shaft
-    #         # 4. Bends the tip up/down
-    #         # 5. Turns the tip side to side
-    #         # 6. gripper 
-    #         # 7. Gripper length
-    #         self.robot_1_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices,
-    #     )
-        
-    #     # self.robot_2.set_joint_position_target(
-    #     #     self.robot_2_curr_targets[:, self.actuated_dof_indices], joint_ids=self.actuated_dof_indices
-    #     # )
-        
     def _apply_action(self):
         """
         Modified to use relative/delta actions instead of absolute positions
@@ -530,11 +471,28 @@ class DualArmHandoverEnv(DirectMARLEnv):
         offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
         return base_pos + offset_world
     
+    def _get_obj_pos_r2(self):
+        base_pos = self.object.data.root_pos_w         # (N, 3)
+        base_rot = self.object.data.root_quat_w         # (N, 4)
+        
+        local_offset = torch.tensor([[0.00012, -0.005, 0.02]], device=base_pos.device)  # (1, 3)
+        N = base_pos.shape[0]
+        local_offset = local_offset.expand(N, -1) 
+        rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
+        
+        offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+        return base_pos + offset_world
+    
 
     def get_dist_toadjust_griplink(self):
         gripper_link_pos = self.get_gripper_link_pos(self.robot_1)
         ee_1 = self._get_ee_position(self.robot_1)
         return torch.norm(gripper_link_pos - ee_1, dim=-1)
+    
+    def get_dist_toadjust_griplink_r2(self):
+        gripper_link_pos = self.get_gripper_link_pos(self.robot_2)
+        ee_2 = self._get_ee_position(self.robot_2)
+        return torch.norm(gripper_link_pos - ee_2, dim=-1)
     
     
     def get_obj_griplnk_tgt_pos(self):
@@ -552,11 +510,43 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         return grip_pos_adjusted
     
+    def get_obj_griplnk_tgt_pos_r2(self):
+        # Get base grip point (already rotation-aware)
+        grip_pos = self._get_obj_pos_r2()
+
+        # Get object orientation
+        base_rot = self.object.data.root_quat_w         # (N, 4)
+        rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
+        z_axis = rot_mat[:, :, 2]                      # Object's local Z in world
+
+        # Get vertical offset based on gripper
+        dist_offset = self.get_dist_toadjust_griplink_r2()  # (N,)
+        grip_pos_adjusted = grip_pos + z_axis * dist_offset.unsqueeze(-1)
+
+        return grip_pos_adjusted
+    
     def get_obj_grip_pos(self):
         base_pos = self.object.data.root_pos_w          # (N, 3)
         base_rot = self.object.data.root_quat_w          # (N, 4)
         # x,y are for the needle
         local_offset = torch.tensor([[-0.00012, 0.005, 0]], device=base_pos.device)  # (1, 3)
+        N = base_pos.shape[0]
+        local_offset = local_offset.expand(N, -1)
+
+        # Convert quaternion to rotation matrix
+        rot_mat = quat_to_matrix(base_rot)              # (N, 3, 3)
+
+        # Apply offset in object local frame
+        offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+
+        # Add to base pos
+        return base_pos + offset_world
+    
+    def get_obj_grip_pos_r2(self):
+        base_pos = self.object.data.root_pos_w          # (N, 3)
+        base_rot = self.object.data.root_quat_w          # (N, 4)
+        # x,y are for the needle
+        local_offset = torch.tensor([[0.00012, -0.005, 0]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1)
 
@@ -599,6 +589,31 @@ class DualArmHandoverEnv(DirectMARLEnv):
         grp_tgt_pts = self.get_gripper_target_points()
         return torch.norm(grp_tip_pts[0] - grp_tgt_pts[0], dim=-1), torch.norm(grp_tip_pts[1] - grp_tgt_pts[1], dim=-1)
 
+
+    def get_grp_tgt_distance_r2(self, robot):
+        grp_tip_pts = self.get_gripper_tip_positions(robot)
+        grp_tgt_pts = self.get_gripper_target_points_r2()
+        return torch.norm(grp_tip_pts[0] - grp_tgt_pts[0], dim=-1), torch.norm(grp_tip_pts[1] - grp_tgt_pts[1], dim=-1)
+
+
+    def get_gripper_target_points_r2(self):
+        displacement = 0.5
+        jaw_radius = 0.01
+        world_disp = displacement * jaw_radius
+        
+        grip_pt = self.get_obj_grip_pos_r2()
+        obj_quat = self.get_obj_rotation()
+        peg_rot_mat = quat_to_matrix(obj_quat)         # (N, 3, 3)
+
+    #   
+        direction = peg_rot_mat[:, :, 0]  # (N, 3)
+
+        # 3. Offset gripper points
+        grip1 = grip_pt + world_disp * direction
+        grip2 = grip_pt - world_disp * direction
+        
+        return grip1, grip2
+    
     def get_gripper_target_points(self):
         displacement = 0.5
         jaw_radius = 0.01
@@ -626,6 +641,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
         obj_grip_pos = self.get_obj_grip_pos()
         pos_new = obj_grip_pos.clone()
         pos_new[:, 2] += self.get_dist_toadjust_griplink() # calculated by printing the distance
+        return pos_new
+    
+    def get_gripper_link_target_pos_r2(self):
+        obj_grip_pos = self.get_obj_grip_pos_r2()
+        pos_new = obj_grip_pos.clone()
+        pos_new[:, 2] += self.get_dist_toadjust_griplink_r2() # calculated by printing the distance
         return pos_new
 
     def get_p1_pos(self, obj_position, approach_angle=35): 
