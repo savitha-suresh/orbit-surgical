@@ -522,7 +522,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w         # (N, 4)
         
-        local_offset = torch.tensor([[0.000, 0.00, 0.02]], device=base_pos.device)  # (1, 3)
+        local_offset = torch.tensor([[-0.00012, 0.005, 0.02]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1) 
         rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
@@ -556,7 +556,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w          # (N, 3)
         base_rot = self.object.data.root_quat_w          # (N, 4)
         # x,y are for the needle
-        local_offset = torch.tensor([[0.0, 0.000, -0.001]], device=base_pos.device)  # (1, 3)
+        local_offset = torch.tensor([[-0.00012, 0.005, 0]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1)
 

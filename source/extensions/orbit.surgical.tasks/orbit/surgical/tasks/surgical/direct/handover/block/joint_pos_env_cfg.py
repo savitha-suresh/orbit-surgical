@@ -87,11 +87,11 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
                     solver_velocity_iteration_count=8,
                     max_angular_velocity=0.1,
                     max_linear_velocity=0.1,
-                    max_depenetration_velocity=1.0,
+                    max_depenetration_velocity=0.01,
                     disable_gravity=False,
                 ),
                 collision_props=CollisionPropertiesCfg(
-                contact_offset=0.0015,  # Small but sufficient for tiny object
+                contact_offset=0.003,  # Small but sufficient for tiny object
                 rest_offset=0.001,     # Very small rest offset
             ),
             ),
