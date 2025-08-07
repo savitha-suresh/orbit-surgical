@@ -921,7 +921,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # Reset object pose with some noise
 
         x_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
-        y_noise = sample_uniform(-0.05, 0.05, (len(env_ids), 1), self.device)
+        y_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
         z_noise = sample_uniform(0, 0.01, (len(env_ids), 1), self.device)
 
         pos_noise = torch.cat([x_noise, y_noise, z_noise], dim=1)
