@@ -41,7 +41,7 @@ class PhaseDetector:
         # Distance thresholds for phase detection
         self.CLOSE_THRESHOLD = 0.01  # 5cm
         self.SUPER_CLOSE_THRESHOLD = 0.005  # 2cm
-        self.EXTREME_CLOSE_THRESHOLD = 0.002
+        self.EXTREME_CLOSE_THRESHOLD = 0.001
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
         self.GRIP_CLOSE_THRESHOLD = 0.005
