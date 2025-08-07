@@ -90,6 +90,10 @@ class BlockHandoverEnvCfg(DualArmHandoverEnvCfg):
                     max_depenetration_velocity=1.0,
                     disable_gravity=False,
                 ),
+                collision_props=CollisionPropertiesCfg(
+                contact_offset=0.0015,  # Small but sufficient for tiny object
+                rest_offset=0.001,     # Very small rest offset
+            ),
             ),
         )
 
