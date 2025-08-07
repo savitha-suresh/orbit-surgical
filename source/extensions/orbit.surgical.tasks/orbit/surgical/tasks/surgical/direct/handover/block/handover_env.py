@@ -791,8 +791,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
 
 
-        mask_grip = ((dist_grp1_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) & 
-                     (dist_grp2_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD) 
+        mask_grip = ((dist_grp1_tgt <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) & 
+                     (dist_grp2_tgt <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) 
                      #(dist_gripper_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD)
                      ) & ( 
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ_GRIP.value] & 

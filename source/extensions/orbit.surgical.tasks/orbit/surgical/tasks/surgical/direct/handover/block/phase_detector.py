@@ -41,6 +41,7 @@ class PhaseDetector:
         # Distance thresholds for phase detection
         self.CLOSE_THRESHOLD = 0.01  # 5cm
         self.SUPER_CLOSE_THRESHOLD = 0.005  # 2cm
+        self.EXTREME_CLOSE_THRESHOLD = 0.002
         self.FAR_THRESHOLD = 0.15  # 15cm
         self.GRIP_THRESHOLD = 0.01
         self.GRIP_CLOSE_THRESHOLD = 0.005
@@ -188,8 +189,8 @@ class PhaseDetector:
             ((gripper_width >= self.GRIP_WIDTH)) &
             (~obj_above_ground) &
             ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value] & 
-            (grp1_tgt_dist > self.GRIP_CLOSE_THRESHOLD) & 
-            (grp2_tgt_dist > self.GRIP_CLOSE_THRESHOLD) 
+            (grp1_tgt_dist > self.EXTREME_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist > self.EXTREME_CLOSE_THRESHOLD) 
             # & 
             # (grip_link_tgt_dist > self.GRIP_CLOSE_THRESHOLD)  
            
@@ -200,11 +201,11 @@ class PhaseDetector:
         phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
             
                 (  (
-                    (grp1_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) & 
-                    (grp2_tgt_dist <= self.GRIP_CLOSE_THRESHOLD)) |
+                    (grp1_tgt_dist <= self.EXTREME_CLOSE_THRESHOLD) & 
+                    (grp2_tgt_dist <= self.EXTREME_CLOSE_THRESHOLD)) |
                     (
-                    (((grp1_tgt_dist < 0.008) & (prev_phases[:, Phases.GRIP_1_CLOSE.value])) & 
-                    ((grp2_tgt_dist < 0.008) & ((prev_phases[:, Phases.GRIP_1_CLOSE.value]))))
+                    (((grp1_tgt_dist < 0.005) & (prev_phases[:, Phases.GRIP_1_CLOSE.value])) & 
+                    ((grp2_tgt_dist < 0.007) & ((prev_phases[:, Phases.GRIP_1_CLOSE.value]))))
 
                     )
                 )&
@@ -228,8 +229,8 @@ class PhaseDetector:
         phase_mask[:, Phases.LIFT.value] = (
 
             (
-                    (grp1_tgt_dist < 0.008) & 
-                    (grp2_tgt_dist < 0.008)) & 
+                    (grp1_tgt_dist < 0.005) & 
+                    (grp2_tgt_dist < 0.007)) & 
             (~obj_above_ground) &
             (gripper_width < 0.15) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
         )
