@@ -320,18 +320,18 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # Scale actions to reasonable delta ranges (e.g., -0.1 to 0.1 radians per step)
         base_scale = 0.19
         reduced_scale = 0.12
-        action_scale = torch.full((self.num_envs, 1), base_scale, device=self.device)
-
+        action_scale_1 = torch.full((self.num_envs, 1), base_scale, device=self.device)
+        action_scale_2 = torch.full((self.num_envs, 1), base_scale, device=self.device)
         # Check if GRIP_OPEN phase is active (1 or True)
         grip_open_active = ~self.not_visited_mask[:, Phases.GRIP_1_OPEN.value] & self.not_visited_mask[:, Phases.GRIP_1_CLOSE.value]
-        lift_active = self.current_phases[:, Phases.LIFT.value].bool()
+        grip_open_active_r2 = ~self.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value] & self.not_visited_mask[:, Phases.GRIP_1_CLOSE_R2.value]
         # Apply reduced scale where grip is open
-        action_scale[grip_open_active] = reduced_scale
-
+        action_scale_1[grip_open_active] = reduced_scale
+        action_scale_2[grip_open_active_r2] = reduced_scale
         
         # Robot 1 - Apply relative changes
         # Scale actions from [-1, 1] to [-action_scale, action_scale]
-        action_deltas_1 = self.actions["robot_1"] * action_scale
+        action_deltas_1 = self.actions["robot_1"] * action_scale_1
         
         # Update targets by adding deltas to CURRENT positions (not previous targets)
         current_joint_pos = self.robot_1.data.joint_pos[:, self.actuated_dof_indices]
@@ -353,7 +353,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         )
         
         # Robot 2 - Same approach
-        action_deltas_2 = self.actions["robot_2"] * action_scale
+        action_deltas_2 = self.actions["robot_2"] * action_scale_2
         
         current_joint_pos_2 = self.robot_2.data.joint_pos[:, self.actuated_dof_indices]
         self.robot_2_curr_targets[:, self.actuated_dof_indices] = (
@@ -371,13 +371,21 @@ class DualArmHandoverEnv(DirectMARLEnv):
             self.hand_dof_upper_limits[:, self.actuated_dof_indices],
         )
         
-
-        gripper_dof_idxs = self.actuated_dof_indices[-2:]
-        grip_close_mask = self.current_phases[:, Phases.GRIP_1_CLOSE.value].bool() | ~self.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
+        r1_mask = self.not_visited_mask[:, Phases.REACH_GOAL_1.value]
+        r2_mask = ~self.not_visited_mask[:, Phases.REACH_GOAL_1.value]
+        
+       
+        grip_close_mask = self.current_phases[r1_mask, Phases.GRIP_1_CLOSE.value].bool() | ~self.not_visited_mask[r1_mask, Phases.REACH_OBJ_GRIP.value]
         grip_envs = torch.nonzero(grip_close_mask).squeeze(-1)
+        
         non_grip_envs = torch.nonzero(~grip_close_mask).squeeze(-1)
 
+        grip_close_mask_r2 = self.current_phases[r2_mask, Phases.GRIP_1_CLOSE_R2.value].bool() | ~self.not_visited_mask[r2_mask, Phases.REACH_OBJ_GRIP_R2.value]
+        grip_envs_r2 = torch.nonzero(grip_close_mask_r2).squeeze(-1)
+        non_grip_envs_r2 = torch.nonzero(~grip_close_mask_r2).squeeze(-1)
+
         # Copy over previous targets for gripper-close envs
+       
         if grip_envs.numel() > 0:
             closed_position = 0.0  # or whatever your closed position should be
             #current_targets = self.robot_1.data.joint_pos_target.clone()
@@ -391,21 +399,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 self.robot_1_curr_targets[grip_envs[:, None], self.actuated_dof_indices],
                 env_ids=grip_envs, joint_ids=self.actuated_dof_indices)
             
-            # Option 2: Set velocity directly for controlled closure
-            # current_velocities = self.robot_1.data.joint_vel_target.clone()
-            # close_velocity = -20.0  # negative for closing, adjust magnitude as needed
-            # current_velocities[grip_envs[:, None], self.actuated_dof_indices[:-2]] = close_velocity
-            # self.robot_1.set_joint_velocity_target(
-            #     current_velocities[grip_envs[:, None], self.actuated_dof_indices[:-2]],
-            #     env_ids=grip_envs, joint_ids=self.actuated_dof_indices[:-2])
-            #self.robot_1_curr_targets[grip_envs[:, None], :] = 0.0
 
-            # # Set only gripper joints for gripper-close envs
-            # self.robot_1.set_joint_position_target(
-            #     self.robot_1_curr_targets[grip_envs[:, None], gripper_dof_idxs],
-            #     env_ids=grip_envs,
-            #     joint_ids=gripper_dof_idxs,
-            # )
 
         # For the remaining envs, set all actuated joints
         if non_grip_envs.numel() > 0:
@@ -415,23 +409,33 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 joint_ids=self.actuated_dof_indices,
             )
 
+        if grip_envs_r2.numel() > 0:
+            closed_position = 0.0  # or whatever your closed position should be
+            #current_targets = self.robot_1.data.joint_pos_target.clone()
+            self.robot_2_curr_targets[grip_envs_r2[:, None], -1] = 0.04
+            self.robot_2_curr_targets[grip_envs_r2[:, None], -2] = -0.04
+            #current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
+            
+            
+            # Set high position gains for immediate response
+            self.robot_2.set_joint_position_target(
+                self.robot_2_curr_targets[grip_envs_r2[:, None], self.actuated_dof_indices],
+                env_ids=grip_envs_r2, joint_ids=self.actuated_dof_indices)
+            
+
+
+        # For the remaining envs, set all actuated joints
+        if non_grip_envs_r2.numel() > 0:
+            self.robot_2.set_joint_position_target(
+                self.robot_2_curr_targets[non_grip_envs_r2[:, None], self.actuated_dof_indices],
+                env_ids=non_grip_envs_r2,
+                joint_ids=self.actuated_dof_indices,
+            )
+
         # Store previous targets for next iteration
         self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
         self.robot_2_prev_targets[:, self.actuated_dof_indices] = self.robot_2_curr_targets[:, self.actuated_dof_indices]
         
-        # Apply the targets
-        # self.robot_1.set_joint_position_target(
-        #     self.robot_1_curr_targets[:, self.actuated_dof_indices], 
-        #     joint_ids=self.actuated_dof_indices,
-        # )
-    
-    
-        # Uncomment when ready to control robot_2
-        # self.robot_2.set_joint_position_target(
-        #     self.robot_2_curr_targets[:, self.actuated_dof_indices], 
-        #     joint_ids=self.actuated_dof_indices
-        # )
-
 
     
 
@@ -470,6 +474,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
         return base_pos + offset_world
+    
+
+    def get_obj_pos_r2(self):
+        return self._get_obj_pos_r2()
     
     def _get_obj_pos_r2(self):
         base_pos = self.object.data.root_pos_w         # (N, 3)
@@ -723,9 +731,18 @@ class DualArmHandoverEnv(DirectMARLEnv):
         gripper_link_tgt = self.get_gripper_link_target_pos()
         obj_griplink_pos = self.get_obj_griplnk_tgt_pos()
         obj_grip_pos = self.get_obj_grip_pos()
+
+
+        obj_pos_r2 = self._get_obj_pos_r2()  # (num_envs, 3)
+        ee_2 = self._get_ee_position(self.robot_2)
+        
+        gripper_link_pos_r2 = self.get_gripper_link_pos(self.robot_2)
+        gripper_link_tgt_r2 = self.get_gripper_link_target_pos_r2()
+        obj_griplink_pos_r2 = self.get_obj_griplnk_tgt_pos_r2()
+        obj_grip_pos_r2 = self.get_obj_grip_pos_r2()
         log_if(not self.cfg.is_training, "phase_regressed_mask", phase_regressed_mask)
         rewards = torch.zeros((num_envs, num_phases), device=device)
-
+        rewards_2 = torch.zeros((num_envs, num_phases), device=device)
 
         dist_p1_ee = torch.norm(p1_pos - ee_1, dim=-1)
         
@@ -864,24 +881,115 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
         rewards[:, Phases.REACH_GOAL_1.value] += 2 * torch.exp(-50 * dist_goal1)
+        
 
+
+
+
+        mask_ro_r2 = (dist_goal1 <= self.phase_detector.CLOSE_THRESHOLD) & (self.not_visited_mask[env_ids, Phases.REACH_GOAL_1.value] 
+                    & (phases_one_hot[env_ids, Phases.REACH_OBJ_R2.value].bool()))
+        self.not_visited_mask[mask_ro_r2, Phases.REACH_GOAL_1.value] = False
+        rewards_2[mask_ro_r2, Phases.REACH_OBJ_R2.value] += 2000
+        #print("rew", rewards)
+        # phase 0: REACH_OBJ
+        dist_obj_ee_2 = torch.norm(obj_pos_r2 - ee_2, dim=-1)
+        dist_obj_griplnk_r2 = torch.norm(obj_griplink_pos_r2 - gripper_link_pos_r2, dim=-1)
+        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+                            2* torch.exp(-50 * dist_obj_ee_2) ,
+                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+                            2* torch.exp(-50 * dist_obj_griplnk_r2) ,
+                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        
+        gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
+        log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)
+        #
+        
+        mask_ro_r2 = ((dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
+                (dist_obj_griplnk_r2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD)) &  (
+                    self.not_visited_mask[env_ids, Phases.REACH_OBJ_R2.value] & 
+                    (phases_one_hot[env_ids, Phases.GRIP_1_OPEN_R2.value].bool()))
+
+        
+        self.not_visited_mask[mask_ro, Phases.REACH_OBJ_R2.value] = False
+        rewards_2[mask_ro, Phases.GRIP_1_OPEN_R2.value] += 2000
+
+        rewards_2[:, Phases.GRIP_1_OPEN_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value],
+                            gripper_width_r2 * 20 ,
+                            rewards_2[:, Phases.GRIP_1_OPEN_R2.value] )
+        #rewards[:, Phases.GRIP_1_OPEN.value] +=  gripper_width * 2
+
+        mask_open = (dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & (
+                    ~self.phase_detector.is_gripper_closed(self.robot_2) & 
+                    self.not_visited_mask[env_ids, Phases.GRIP_1_OPEN_R2.value] & 
+                    (phases_one_hot[env_ids, Phases.REACH_OBJ_GRIP_R2.value].bool()))
+
+        
+        self.not_visited_mask[mask_open, Phases.GRIP_1_OPEN_R2.value] = False
+        rewards_2[mask_open, Phases.REACH_OBJ_GRIP_R2.value] += 2000
+
+        dist_grp_tgt_r2 = self.get_grp_tgt_distance_r2(self.robot_1)
+        dist_grp1_tgt_r2, dist_grp2_tgt_r2 = dist_grp_tgt_r2
+        rewards_2[:, Phases.REACH_OBJ_GRIP_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ_GRIP_R2.value],
+                            2* torch.exp(-100 * dist_grp1_tgt_r2) ,
+                            rewards_2[:, Phases.REACH_OBJ_GRIP_R2.value] )
+        
+        rewards_2[:, Phases.REACH_OBJ_GRIP_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ_GRIP_R2.value],
+                            2* torch.exp(-100 * dist_grp2_tgt_r2) ,
+                            rewards_2[:, Phases.REACH_OBJ_GRIP_R2.value] )
+       
+
+
+
+        mask_grip = ((dist_grp1_tgt_r2 <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) & 
+                     (dist_grp2_tgt_r2 <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) 
+                     #(dist_gripper_tgt <= self.phase_detector.GRIP_CLOSE_THRESHOLD)
+                     ) & ( 
+                    self.not_visited_mask[env_ids, Phases.REACH_OBJ_GRIP_R2.value] & 
+                    (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE_R2.value].bool()))
+
+        
+        self.not_visited_mask[mask_grip, Phases.REACH_OBJ_GRIP_R2.value] = False
+        rewards_2[mask_grip, Phases.GRIP_1_CLOSE_R2.value] += 2000
+        # phase 2: GRIP_1_CLOSE
+
+        rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.GRIP_1_CLOSE_R2.value],
+                            200 * torch.exp(-10 * gripper_width) ,
+                            rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] )
+        #rewards[:, Phases.GRIP_1_CLOSE.value] += 200* torch.exp(-5 * gripper_width)
+
+
+        # mask_close = (gripper_width < 0.15) & (
+        #                 self.not_visited_mask[env_ids, Phases.GRIP_1_CLOSE.value] 
+        #                     & ~self.not_visited_mask[env_ids, Phases.REACH_OBJ.value]) & (
+        #                         phases_one_hot[env_ids, Phases.LIFT.value].bool()
+        #                     )
+
+        
+        # self.not_visited_mask[mask_close, Phases.GRIP_1_CLOSE.value] = False
         # phase 5: REACH_GOAL_2
         dist_goal2 = torch.norm(goal_pos - ee_2, dim=-1)
-        rewards[:, Phases.REACH_GOAL_2.value] = torch.exp(-self.cfg.dist_reward_scale * dist_goal2)
+        rewards_2[:, Phases.REACH_GOAL_2.value] = torch.exp(-self.cfg.dist_reward_scale * dist_goal2)
 
         # phase 6: GRIP_2
         holding_2 = self.phase_detector.is_holding_object(self.robot_2)
-        rewards[:, Phases.GRIP_2.value] = 10 * holding_2.float()
+        rewards_2[:, Phases.GRIP_2.value] = 10 * holding_2.float()
 
         # phase 7: RELEASE_1
         holding_1 = self.phase_detector.is_holding_object(self.robot_1)
         both_condition = (~holding_1) & holding_2
-        rewards[:, Phases.RELEASE_1.value] = 10 * both_condition.float()
+        rewards_2[:, Phases.RELEASE_1.value] = 10 * both_condition.float()
 
         # phase 8: END
         
         dist_home = torch.norm(ee_1 - self.r1_init_pos, dim=-1)
-        rewards[:, Phases.END.value] = torch.exp(-self.cfg.dist_reward_scale * dist_home)
+        rewards_2[:, Phases.END.value] = torch.exp(-self.cfg.dist_reward_scale * dist_home)
 
         # final reward for robot_1: dot product (envs × phases) ⊙ (envs × phases)
         
@@ -890,7 +998,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         final_rewards_r1 = torch.sum(phases_one_hot * rewards  , dim=1)  # (num_envs,)
         final_rewards_r1[phase_regressed_mask] += self.cfg.phase_regressed_penalty
         
-        final_rewards_r2 = torch.zeros((self.num_envs,), dtype=torch.float, device=self.robot_1.data.device)
+        final_rewards_r2 = torch.sum(phases_one_hot * rewards_2  , dim=1)
+        final_rewards_r2[phase_regressed_mask] += self.cfg.phase_regressed_penalty
         log_if(not self.cfg.is_training, "visited", self.not_visited_mask)
         log_if(not self.cfg.is_training, f"rewards {final_rewards_r1} rewards_all {rewards}")
         
