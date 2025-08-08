@@ -188,6 +188,205 @@ class DualArmHandoverEnv(DirectMARLEnv):
         ee_pose = torch.cat([ee_pos, ee_quat], dim=-1)  # [num_envs, 7]
         ee_pose = ee_pose.squeeze(1)
         return ee_pose
+    
+
+    def get_observation_r1(self, robot):
+
+        
+        # Resolve joint IDs
+        joint_ids = [robot.joint_names.index(name) for name in robot.joint_names]
+        
+        # Keep relative joint positions (this is already good)
+        joint_pos_rel = robot.data.joint_pos[:, joint_ids] - robot.data.default_joint_pos[:, joint_ids]
+        joint_vel_rel = robot.data.joint_vel[:, joint_ids] - robot.data.default_joint_vel[:, joint_ids]
+        
+        # Get current poses
+        obj_pos = self._get_obj_pos()
+        ee_pose = self._get_ee_position(robot)
+        gripper_link_pos = self.get_gripper_link_pos(robot)
+
+
+        
+        gripper_link_pos = self.get_gripper_link_pos(robot)
+        
+        # RELATIVE OBSERVATIONS - Key changes here
+        # 1. End-effector to object vector (relative position)
+        ee_to_obj = obj_pos - ee_pose  # Assuming ee_pose has position in first 3 dims
+        
+        # 2. End-effector to goal vector (relative position)
+        goal_pos = self.get_goal_pos(obj_pos)
+        ee_to_goal = goal_pos - ee_pose
+        
+        # 3. Object to goal vector (relative position)
+        
+        
+        # 4. Distance metrics (scale-invariant)
+        ee_to_obj_distance = torch.norm(ee_to_obj, dim=-1, keepdim=True)
+        ee_to_goal_distance = torch.norm(ee_to_goal, dim=-1, keepdim=True)
+       
+        
+        # 5. Normalized direction vectors
+        ee_to_obj_dir = ee_to_obj / (ee_to_obj_distance + 1e-8)
+        ee_to_goal_dir = ee_to_goal / (ee_to_goal_distance + 1e-8)
+        
+        
+        
+        # 7. Get relative position to waypoints
+        p1_pos = self.get_p1_pos(obj_pos)
+        ee_to_p1 = p1_pos - ee_pose[:, :3]
+        ee_to_p1_dir = ee_to_p1 / (torch.norm(ee_to_p1, dim=-1, keepdim=True) + 1e-8)
+
+
+        grip_pos = self.get_gripper_tip_positions(self.robot_1)
+        grp_tgt_pos = self.get_gripper_target_points()
+        grp1_tgt_pos = grp_tgt_pos[0]
+        grp2_tgt_pos = grp_tgt_pos[1]
+        grip1_pos = grip_pos[0]
+        grip2_pos = grip_pos[1]
+
+        ee1_to_grip = grp1_tgt_pos - grip1_pos
+        ee1_to_grip_dir = ee1_to_grip / (torch.norm(ee1_to_grip, dim=-1, keepdim=True) + 1e-8)
+        ee1_to_grip_distance = torch.norm(ee1_to_grip, dim=-1, keepdim=True)
+
+        
+        ee2_to_grip = grp2_tgt_pos - grip2_pos
+        ee2_to_grip_dir = ee2_to_grip / (torch.norm(ee2_to_grip, dim=-1, keepdim=True) + 1e-8)
+        ee2_to_grip_distance = torch.norm(ee2_to_grip, dim=-1, keepdim=True)
+
+
+        gripper_target_pos = self.get_gripper_link_target_pos()
+        gripper_to_target = gripper_target_pos - gripper_link_pos
+        gripper_to_target_dir = gripper_to_target / (torch.norm(gripper_to_target, dim=-1, keepdim=True) + 1e-8)
+        gripper_to_target_distance = torch.norm(gripper_to_target, dim=-1, keepdim=True)
+
+
+        obj_griplink_target_pos = self.get_obj_griplnk_tgt_pos()
+        objgripper_to_target = obj_griplink_target_pos - gripper_link_pos
+        objgripper_to_target_dir = objgripper_to_target / (torch.norm(objgripper_to_target, dim=-1, keepdim=True) + 1e-8)
+        objgripper_to_target_distance = torch.norm(objgripper_to_target, dim=-1, keepdim=True)
+
+
+        # Concatenate RELATIVE observations
+        obs_list = [
+            joint_pos_rel,                    # Joint positions (already relative)
+            joint_vel_rel,                    # Joint velocities (already relative)
+            ee_to_obj,                        # Vector from EE to object
+            ee_to_goal,                       # Vector from EE to goal
+            
+            ee_to_p1,                         # Vector from EE to waypoint
+            ee1_to_grip, 
+            ee2_to_grip,
+            gripper_to_target,
+            objgripper_to_target,
+            ee_to_obj_distance,               # Distance to object
+            ee_to_goal_distance,              # Distance to goal
+            ee1_to_grip_distance, 
+            ee2_to_grip_distance,
+            gripper_to_target_distance,
+            objgripper_to_target_distance,
+            ee_to_obj_dir,                    # Direction to object (normalized)
+            ee_to_goal_dir,                   # Direction to goal (normalized)
+           
+            gripper_to_target_dir,
+            objgripper_to_target_dir,
+            ee_to_p1_dir,                     # Direction to waypoint
+            ee1_to_grip_dir,
+            ee2_to_grip_dir,
+            self.not_visited_mask,            # Task phase info
+        ]
+        
+        
+        # Concatenate along the feature dimension
+        robot_obs = torch.cat(obs_list, dim=-1)
+        return robot_obs
+    
+
+    def get_observation_r2(self, robot):
+
+        
+        # Resolve joint IDs
+        joint_ids = [robot.joint_names.index(name) for name in robot.joint_names]
+        
+        # Keep relative joint positions (this is already good)
+        joint_pos_rel = robot.data.joint_pos[:, joint_ids] - robot.data.default_joint_pos[:, joint_ids]
+        joint_vel_rel = robot.data.joint_vel[:, joint_ids] - robot.data.default_joint_vel[:, joint_ids]
+        
+        # Get current poses
+        obj_pos = self._get_obj_pos_r2()
+        ee_pose = self._get_ee_position(robot)
+        gripper_link_pos = self.get_gripper_link_pos(robot)
+
+        
+        # RELATIVE OBSERVATIONS - Key changes here
+        # 1. End-effector to object vector (relative position)
+        ee_to_obj = obj_pos - ee_pose  # Assuming ee_pose has position in first 3 dims
+        
+        # 2. End-effector to goal vector (relative position)
+       
+        
+        # 4. Distance metrics (scale-invariant)
+        ee_to_obj_distance = torch.norm(ee_to_obj, dim=-1, keepdim=True)
+        
+        
+        # 5. Normalized direction vectors
+        ee_to_obj_dir = ee_to_obj / (ee_to_obj_distance + 1e-8)
+
+        grip_pos = self.get_gripper_tip_positions(self.robot_1)
+        grp_tgt_pos = self.get_gripper_target_points_r2()
+        grp1_tgt_pos = grp_tgt_pos[0]
+        grp2_tgt_pos = grp_tgt_pos[1]
+        grip1_pos = grip_pos[0]
+        grip2_pos = grip_pos[1]
+
+        ee1_to_grip = grp1_tgt_pos - grip1_pos
+        ee1_to_grip_dir = ee1_to_grip / (torch.norm(ee1_to_grip, dim=-1, keepdim=True) + 1e-8)
+        ee1_to_grip_distance = torch.norm(ee1_to_grip, dim=-1, keepdim=True)
+
+        
+        ee2_to_grip = grp2_tgt_pos - grip2_pos
+        ee2_to_grip_dir = ee2_to_grip / (torch.norm(ee2_to_grip, dim=-1, keepdim=True) + 1e-8)
+        ee2_to_grip_distance = torch.norm(ee2_to_grip, dim=-1, keepdim=True)
+
+
+        gripper_target_pos = self.get_gripper_link_target_pos_r2()
+        gripper_to_target = gripper_target_pos - gripper_link_pos
+        gripper_to_target_dir = gripper_to_target / (torch.norm(gripper_to_target, dim=-1, keepdim=True) + 1e-8)
+        gripper_to_target_distance = torch.norm(gripper_to_target, dim=-1, keepdim=True)
+
+
+        obj_griplink_target_pos = self.get_obj_griplnk_tgt_pos_r2()
+        objgripper_to_target = obj_griplink_target_pos - gripper_link_pos
+        objgripper_to_target_dir = objgripper_to_target / (torch.norm(objgripper_to_target, dim=-1, keepdim=True) + 1e-8)
+        objgripper_to_target_distance = torch.norm(objgripper_to_target, dim=-1, keepdim=True)
+
+
+        # Concatenate RELATIVE observations
+        obs_list = [
+            joint_pos_rel,                    # Joint positions (already relative)
+            joint_vel_rel,                    # Joint velocities (already relative)
+            ee_to_obj,                        # Vector from EE to object
+            ee1_to_grip, 
+            ee2_to_grip,
+            gripper_to_target,
+            objgripper_to_target,
+            ee_to_obj_distance,               # Distance to object
+            ee1_to_grip_distance, 
+            ee2_to_grip_distance,
+            gripper_to_target_distance,
+            objgripper_to_target_distance,
+            ee_to_obj_dir,                    # Direction to object (normalized)
+            gripper_to_target_dir,
+            objgripper_to_target_dir,
+            ee1_to_grip_dir,
+            ee2_to_grip_dir,
+            self.not_visited_mask,            # Task phase info
+        ]
+        
+        
+        # Concatenate along the feature dimension
+        robot_obs = torch.cat(obs_list, dim=-1)
+        return robot_obs
+
 
     def _get_observations(self):
            
@@ -198,113 +397,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #print(self.current_phases)
         # Process each robot separately
         for robot_name in self.cfg.possible_agents:
-            robot = self.scene.articulations[robot_name]
-            
-            # Resolve joint IDs
-            joint_ids = [robot.joint_names.index(name) for name in robot.joint_names]
-            
-            # Keep relative joint positions (this is already good)
-            joint_pos_rel = robot.data.joint_pos[:, joint_ids] - robot.data.default_joint_pos[:, joint_ids]
-            joint_vel_rel = robot.data.joint_vel[:, joint_ids] - robot.data.default_joint_vel[:, joint_ids]
-            
-            # Get current poses
-            obj_pos = self._get_obj_pos()
-            ee_pose = self._get_ee_position(robot)
-            gripper_link_pos = self.get_gripper_link_pos(robot)
-            
-            # RELATIVE OBSERVATIONS - Key changes here
-            # 1. End-effector to object vector (relative position)
-            ee_to_obj = obj_pos - ee_pose  # Assuming ee_pose has position in first 3 dims
-            
-            # 2. End-effector to goal vector (relative position)
-            goal_pos = self.get_goal_pos(obj_pos)
-            ee_to_goal = goal_pos - ee_pose
-            
-            # 3. Object to goal vector (relative position)
-            obj_to_goal = goal_pos - obj_pos
-            
-            # 4. Distance metrics (scale-invariant)
-            ee_to_obj_distance = torch.norm(ee_to_obj, dim=-1, keepdim=True)
-            ee_to_goal_distance = torch.norm(ee_to_goal, dim=-1, keepdim=True)
-            obj_to_goal_distance = torch.norm(obj_to_goal, dim=-1, keepdim=True)
-            
-            # 5. Normalized direction vectors
-            ee_to_obj_dir = ee_to_obj / (ee_to_obj_distance + 1e-8)
-            ee_to_goal_dir = ee_to_goal / (ee_to_goal_distance + 1e-8)
-            obj_to_goal_dir = obj_to_goal / (obj_to_goal_distance + 1e-8)
-            
-            
-            
-            # 7. Get relative position to waypoints
-            p1_pos = self.get_p1_pos(obj_pos)
-            ee_to_p1 = p1_pos - ee_pose[:, :3]
-            ee_to_p1_dir = ee_to_p1 / (torch.norm(ee_to_p1, dim=-1, keepdim=True) + 1e-8)
-
-
-            grip_pos = self.get_gripper_tip_positions(self.robot_1)
-            grp_tgt_pos = self.get_gripper_target_points()
-            grp1_tgt_pos = grp_tgt_pos[0]
-            grp2_tgt_pos = grp_tgt_pos[1]
-            grip1_pos = grip_pos[0]
-            grip2_pos = grip_pos[1]
-
-            ee1_to_grip = grp1_tgt_pos - grip1_pos
-            ee1_to_grip_dir = ee1_to_grip / (torch.norm(ee1_to_grip, dim=-1, keepdim=True) + 1e-8)
-            ee1_to_grip_distance = torch.norm(ee1_to_grip, dim=-1, keepdim=True)
-
-            
-            ee2_to_grip = grp2_tgt_pos - grip2_pos
-            ee2_to_grip_dir = ee2_to_grip / (torch.norm(ee2_to_grip, dim=-1, keepdim=True) + 1e-8)
-            ee2_to_grip_distance = torch.norm(ee2_to_grip, dim=-1, keepdim=True)
-
-
-            gripper_target_pos = self.get_gripper_link_target_pos()
-            gripper_to_target = gripper_target_pos - gripper_link_pos
-            gripper_to_target_dir = gripper_to_target / (torch.norm(gripper_to_target, dim=-1, keepdim=True) + 1e-8)
-            gripper_to_target_distance = torch.norm(gripper_to_target, dim=-1, keepdim=True)
-
-
-            obj_griplink_target_pos = self.get_obj_griplnk_tgt_pos()
-            objgripper_to_target = obj_griplink_target_pos - gripper_link_pos
-            objgripper_to_target_dir = objgripper_to_target / (torch.norm(objgripper_to_target, dim=-1, keepdim=True) + 1e-8)
-            objgripper_to_target_distance = torch.norm(objgripper_to_target, dim=-1, keepdim=True)
-
-
-            # Concatenate RELATIVE observations
-            obs_list = [
-                joint_pos_rel,                    # Joint positions (already relative)
-                joint_vel_rel,                    # Joint velocities (already relative)
-                ee_to_obj,                        # Vector from EE to object
-                ee_to_goal,                       # Vector from EE to goal
-                obj_to_goal,                      # Vector from object to goal
-                ee_to_p1,                         # Vector from EE to waypoint
-                ee1_to_grip, 
-                ee2_to_grip,
-                gripper_to_target,
-                objgripper_to_target,
-                ee_to_obj_distance,               # Distance to object
-                ee_to_goal_distance,              # Distance to goal
-                ee1_to_grip_distance, 
-                ee2_to_grip_distance,
-                gripper_to_target_distance,
-                objgripper_to_target_distance,
-                ee_to_obj_dir,                    # Direction to object (normalized)
-                ee_to_goal_dir,                   # Direction to goal (normalized)
-                obj_to_goal_dir,                  # Direction object should move
-                gripper_to_target_dir,
-                objgripper_to_target_dir,
-                ee_to_p1_dir,                     # Direction to waypoint
-                ee1_to_grip_dir,
-                ee2_to_grip_dir,
-                self.not_visited_mask,            # Task phase info
-                self.phase_regressed_mask.unsqueeze(1)
-            ]
-            
-            
-            # Concatenate along the feature dimension
-            robot_obs = torch.cat(obs_list, dim=-1)
-            observations[robot_name] = robot_obs
-    
+            if robot_name == 'robot_1':
+                observations[robot_name] = self.get_observation_r1(self.robot_1)
+            else:
+                observations[robot_name] = self.get_observation_r2(self.robot_2)
         return observations
     
 
@@ -974,22 +1070,22 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         # self.not_visited_mask[mask_close, Phases.GRIP_1_CLOSE.value] = False
         # phase 5: REACH_GOAL_2
-        dist_goal2 = torch.norm(goal_pos - ee_2, dim=-1)
-        rewards_2[:, Phases.REACH_GOAL_2.value] = torch.exp(-self.cfg.dist_reward_scale * dist_goal2)
+        # dist_goal2 = torch.norm(goal_pos - ee_2, dim=-1)
+        # rewards_2[:, Phases.REACH_GOAL_2.value] = torch.exp(-self.cfg.dist_reward_scale * dist_goal2)
 
-        # phase 6: GRIP_2
-        holding_2 = self.phase_detector.is_holding_object(self.robot_2)
-        rewards_2[:, Phases.GRIP_2.value] = 10 * holding_2.float()
+        # # phase 6: GRIP_2
+        # holding_2 = self.phase_detector.is_holding_object(self.robot_2)
+        # rewards_2[:, Phases.GRIP_2.value] = 10 * holding_2.float()
 
-        # phase 7: RELEASE_1
-        holding_1 = self.phase_detector.is_holding_object(self.robot_1)
-        both_condition = (~holding_1) & holding_2
-        rewards_2[:, Phases.RELEASE_1.value] = 10 * both_condition.float()
+        # # phase 7: RELEASE_1
+        # holding_1 = self.phase_detector.is_holding_object(self.robot_1)
+        # both_condition = (~holding_1) & holding_2
+        # rewards_2[:, Phases.RELEASE_1.value] = 10 * both_condition.float()
 
-        # phase 8: END
+        # # phase 8: END
         
-        dist_home = torch.norm(ee_1 - self.r1_init_pos, dim=-1)
-        rewards_2[:, Phases.END.value] = torch.exp(-self.cfg.dist_reward_scale * dist_home)
+        # dist_home = torch.norm(ee_1 - self.r1_init_pos, dim=-1)
+        # rewards[:, Phases.END.value] = torch.exp(-self.cfg.dist_reward_scale * dist_home)
 
         # final reward for robot_1: dot product (envs × phases) ⊙ (envs × phases)
         

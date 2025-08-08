@@ -34,13 +34,14 @@ class Phases(Enum):
     GRIP_1_CLOSE_R2 = 10
    
     # R2 reaches near ee of R1
-    REACH_GOAL_2 = 11
-    #R2 grips object
-    GRIP_2 = 12
-    #R1 releases object
-    RELEASE_1 = 13
-    # Task completed
-    END = 14
+    # REACH_GOAL_2 = 11
+    # #R2 grips object
+    # GRIP_2 = 12
+    # #R1 releases object
+    # RELEASE_1 = 13
+    # # Task completed
+    # END = 14
+
 
 class PhaseDetector:
     def __init__(self, cfg, env):
