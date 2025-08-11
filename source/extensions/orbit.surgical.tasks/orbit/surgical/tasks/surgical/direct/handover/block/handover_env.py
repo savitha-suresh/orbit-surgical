@@ -480,53 +480,67 @@ class DualArmHandoverEnv(DirectMARLEnv):
         grip_envs_r2 = torch.nonzero(grip_close_mask_r2).squeeze(-1)
         non_grip_envs_r2 = torch.nonzero(~grip_close_mask_r2).squeeze(-1)
 
+
+        global_grip_envs_r1 = r1_mask.nonzero(as_tuple=True)[0][grip_envs]
+        global_non_grip_envs_r1 = r1_mask.nonzero(as_tuple=True)[0][non_grip_envs]
+
+        global_grip_envs_r2 = r2_mask.nonzero(as_tuple=True)[0][grip_envs_r2]
+        global_non_grip_envs_r2 = r2_mask.nonzero(as_tuple=True)[0][non_grip_envs_r2]
         # Copy over previous targets for gripper-close envs
        
-        if grip_envs.numel() > 0:
-            closed_position = 0.0  # or whatever your closed position should be
-            #current_targets = self.robot_1.data.joint_pos_target.clone()
-            self.robot_1_curr_targets[grip_envs[:, None], -1] = 0.04
-            self.robot_1_curr_targets[grip_envs[:, None], -2] = -0.04
-            #current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
-            
-            
-            # Set high position gains for immediate response
+        if global_grip_envs_r1.numel() > 0:
+            self.robot_1_curr_targets[global_grip_envs_r1[:, None], -1] = 0.04
+            self.robot_1_curr_targets[global_grip_envs_r1[:, None], -2] = -0.04
             self.robot_1.set_joint_position_target(
-                self.robot_1_curr_targets[grip_envs[:, None], self.actuated_dof_indices],
-                env_ids=grip_envs, joint_ids=self.actuated_dof_indices)
-            
-
-
-        # For the remaining envs, set all actuated joints
-        if non_grip_envs.numel() > 0:
-            self.robot_1.set_joint_position_target(
-                self.robot_1_curr_targets[non_grip_envs[:, None], self.actuated_dof_indices],
-                env_ids=non_grip_envs,
-                joint_ids=self.actuated_dof_indices,
+                self.robot_1_curr_targets[global_grip_envs_r1[:, None], self.actuated_dof_indices],
+                env_ids=global_grip_envs_r1,
+                joint_ids=self.actuated_dof_indices
             )
 
-        if grip_envs_r2.numel() > 0:
+        if global_non_grip_envs_r1.numel() > 0:
+            self.robot_1.set_joint_position_target(
+                self.robot_1_curr_targets[global_non_grip_envs_r1[:, None], self.actuated_dof_indices],
+                env_ids=global_non_grip_envs_r1,
+                joint_ids=self.actuated_dof_indices
+            )
+
+        inactive_r1_envs = r2_mask.nonzero(as_tuple=True)[0]
+
+        if inactive_r1_envs.numel() > 0:
+            # Get current positions
+            qpos_r1 = self.robot_1.data.joint_pos[inactive_r1_envs][:, self.actuated_dof_indices]
+            # Keep them as targets
+            self.robot_1.set_joint_position_target(
+                qpos_r1,
+                env_ids=inactive_r1_envs,
+                joint_ids=self.actuated_dof_indices
+            )
+
+        if global_grip_envs_r2.numel() > 0:
             closed_position = 0.0  # or whatever your closed position should be
             #current_targets = self.robot_1.data.joint_pos_target.clone()
-            self.robot_2_curr_targets[grip_envs_r2[:, None], -1] = 0.04
-            self.robot_2_curr_targets[grip_envs_r2[:, None], -2] = -0.04
+            self.robot_2_curr_targets[global_grip_envs_r2[:, None], -1] = 0.04
+            self.robot_2_curr_targets[global_grip_envs_r2[:, None], -2] = -0.04
             #current_targets[grip_envs[:, None], gripper_dof_idxs] = closed_position
             
             
             # Set high position gains for immediate response
             self.robot_2.set_joint_position_target(
-                self.robot_2_curr_targets[grip_envs_r2[:, None], self.actuated_dof_indices],
-                env_ids=grip_envs_r2, joint_ids=self.actuated_dof_indices)
+                self.robot_2_curr_targets[global_grip_envs_r2[:, None], self.actuated_dof_indices],
+                env_ids=global_grip_envs_r2, joint_ids=self.actuated_dof_indices)
             
 
 
         # For the remaining envs, set all actuated joints
-        if non_grip_envs_r2.numel() > 0:
+        if global_non_grip_envs_r2.numel() > 0:
             self.robot_2.set_joint_position_target(
-                self.robot_2_curr_targets[non_grip_envs_r2[:, None], self.actuated_dof_indices],
-                env_ids=non_grip_envs_r2,
+                self.robot_2_curr_targets[global_non_grip_envs_r2[:, None], self.actuated_dof_indices],
+                env_ids=global_non_grip_envs_r2,
                 joint_ids=self.actuated_dof_indices,
             )
+
+
+        
 
         # Store previous targets for next iteration
         self.robot_1_prev_targets[:, self.actuated_dof_indices] = self.robot_1_curr_targets[:, self.actuated_dof_indices]
@@ -1003,14 +1017,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
         log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)
         #
         
-        mask_ro_r2 = ((dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
+        mask_grip_r2 = ((dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
                 (dist_obj_griplnk_r2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD)) &  (
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ_R2.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_OPEN_R2.value].bool()))
 
         
-        self.not_visited_mask[mask_ro, Phases.REACH_OBJ_R2.value] = False
-        rewards_2[mask_ro, Phases.GRIP_1_OPEN_R2.value] += 2000
+        self.not_visited_mask[mask_grip_r2, Phases.REACH_OBJ_R2.value] = False
+        rewards_2[mask_grip_r2, Phases.GRIP_1_OPEN_R2.value] += 2000
 
         rewards_2[:, Phases.GRIP_1_OPEN_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value],
@@ -1018,14 +1032,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             rewards_2[:, Phases.GRIP_1_OPEN_R2.value] )
         #rewards[:, Phases.GRIP_1_OPEN.value] +=  gripper_width * 2
 
-        mask_open = (dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & (
+        mask_open_r2 = (dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & (
                     ~self.phase_detector.is_gripper_closed(self.robot_2) & 
                     self.not_visited_mask[env_ids, Phases.GRIP_1_OPEN_R2.value] & 
                     (phases_one_hot[env_ids, Phases.REACH_OBJ_GRIP_R2.value].bool()))
 
         
-        self.not_visited_mask[mask_open, Phases.GRIP_1_OPEN_R2.value] = False
-        rewards_2[mask_open, Phases.REACH_OBJ_GRIP_R2.value] += 2000
+        self.not_visited_mask[mask_open_r2, Phases.GRIP_1_OPEN_R2.value] = False
+        rewards_2[mask_open_r2, Phases.REACH_OBJ_GRIP_R2.value] += 2000
 
         dist_grp_tgt_r2 = self.get_grp_tgt_distance_r2(self.robot_1)
         dist_grp1_tgt_r2, dist_grp2_tgt_r2 = dist_grp_tgt_r2
