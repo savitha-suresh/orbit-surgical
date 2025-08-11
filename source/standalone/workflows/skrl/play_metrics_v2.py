@@ -365,7 +365,7 @@ def main():
     # Initialize metrics collection
     metrics = EvaluationMetrics(
         num_envs=args_cli.num_envs,
-        num_phases=6,  # Adjust based on your task
+        num_phases=7,  # Adjust based on your task
         height_threshold=args_cli.height_threshold,
         num_episodes=args_cli.num_episodes
     )
