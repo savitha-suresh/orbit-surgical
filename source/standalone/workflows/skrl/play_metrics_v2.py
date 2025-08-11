@@ -52,7 +52,7 @@ parser.add_argument("--real-time", action="store_true", default=False, help="Run
 
 # Evaluation specific arguments
 parser.add_argument("--num_episodes", type=int, default=10, help="Number of episodes to evaluate.")
-parser.add_argument("--height_threshold", type=float, default=0.02, help="Height threshold for object success.")
+parser.add_argument("--height_threshold", type=float, default=0.008, help="Height threshold for object success.")
 parser.add_argument("--results_dir", type=str, default="evaluation_results", help="Directory to save results.")
 
 
