@@ -285,60 +285,61 @@ class PhaseDetector:
 
         phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
                     (
-                     (ee2_obj_dist > self.SUPER_CLOSE_THRESHOLD) &
+                        (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+                     (ee2_obj_dist > self.CLOSE_THRESHOLD) &
                         ~self.env.not_visited_mask[:, Phases.LIFT.value] & 
-                        (obj_grip_link_tg_dist_r2 > self.SUPER_CLOSE_THRESHOLD)
+                        (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
                      )
                     
                     & (~obj_above_ground)
                 )
 
             # PHASE 1: GRIP_1_OPEN
-        phase_mask[:, Phases.GRIP_1_OPEN_R2.value] = (
-            (ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD) &
-            (obj_grip_link_tg_dist_r2 <= self.SUPER_CLOSE_THRESHOLD) & 
-            (gripper_width_r2 < self.GRIP_WIDTH) &
-            (~obj_above_ground) &
-            ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]
-        )
+        # phase_mask[:, Phases.GRIP_1_OPEN_R2.value] = (
+        #     (ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD) &
+        #     (obj_grip_link_tg_dist_r2 <= self.SUPER_CLOSE_THRESHOLD) & 
+        #     (gripper_width_r2 < self.GRIP_WIDTH) &
+        #     (~obj_above_ground) &
+        #     ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]
+        # )
 
-        phase_mask[:, Phases.REACH_OBJ_GRIP_R2.value] = (
-            ((ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
-            | (ee2_obj_dist <= 0.025) & ((prev_phases[:, Phases.REACH_OBJ_GRIP_R2.value]))
-            ) & 
-            ((gripper_width_r2 >= self.GRIP_WIDTH)) &
-            (~obj_above_ground) &
-            ~self.env.not_visited_mask[:, Phases.REACH_OBJ_R2.value] & 
-            (grp1_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) & 
-            (grp2_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) 
-        )
+        # phase_mask[:, Phases.REACH_OBJ_GRIP_R2.value] = (
+        #     ((ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
+        #     | (ee2_obj_dist <= 0.025) & ((prev_phases[:, Phases.REACH_OBJ_GRIP_R2.value]))
+        #     ) & 
+        #     ((gripper_width_r2 >= self.GRIP_WIDTH)) &
+        #     (~obj_above_ground) &
+        #     ~self.env.not_visited_mask[:, Phases.REACH_OBJ_R2.value] & 
+        #     (grp1_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) & 
+        #     (grp2_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) 
+        # )
 
-        # PHASE 2: GRIP_1_CLOSE
-        phase_mask[:, Phases.GRIP_1_CLOSE_R2.value] = (
+        # # PHASE 2: GRIP_1_CLOSE
+        # phase_mask[:, Phases.GRIP_1_CLOSE_R2.value] = (
             
-                (  (
-                    (grp1_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD) & 
-                    (grp2_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD)) |
-                    (
-                    (((grp1_tgt_dist_r2 < 0.005) & (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])) & 
-                    ((grp2_tgt_dist_r2 < 0.007) & ((prev_phases[:, Phases.GRIP_1_CLOSE_R2.value]))))
+        #         (  (
+        #             (grp1_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD) & 
+        #             (grp2_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD)) |
+        #             (
+        #             (((grp1_tgt_dist_r2 < 0.005) & (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])) & 
+        #             ((grp2_tgt_dist_r2 < 0.007) & ((prev_phases[:, Phases.GRIP_1_CLOSE_R2.value]))))
 
-                    )
-                )&
+        #             )
+        #         )&
                 
-            (~obj_above_ground) &
-            (
-                (
-                    (gripper_width_r2 >= self.GRIP_WIDTH) &
-                    (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value])
-                ) |
-                (
-                    (gripper_width_r2 >= 0.15) &
-                    (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])
-                )
-            ) &
-            (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value])
-        )
+        #     (~obj_above_ground) &
+        #     (
+        #         (
+        #             (gripper_width_r2 >= self.GRIP_WIDTH) &
+        #             (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value])
+        #         ) |
+        #         (
+        #             (gripper_width_r2 >= 0.15) &
+        #             (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])
+        #         )
+        #     ) &
+        #     (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value])
+        # )
 
 
         # # # PHASE 3: LIFT
