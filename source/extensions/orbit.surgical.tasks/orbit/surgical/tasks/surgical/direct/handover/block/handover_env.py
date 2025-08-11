@@ -518,13 +518,13 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         active_r2_envs = r2_mask.nonzero(as_tuple=True)[0]
 
-        if active_r2_envs.numel() > 0:
-            # Get current positions
-            self.robot_2.set_joint_position_target(
-                self.robot_2_curr_targets[active_r2_envs[:, None], self.actuated_dof_indices],
-                env_ids=active_r2_envs,
-                joint_ids=self.actuated_dof_indices
-            )
+        # if active_r2_envs.numel() > 0:
+        #     # Get current positions
+        #     self.robot_2.set_joint_position_target(
+        #         self.robot_2_curr_targets[active_r2_envs[:, None], self.actuated_dof_indices],
+        #         env_ids=active_r2_envs,
+        #         joint_ids=self.actuated_dof_indices
+        #     )
 
         # if global_grip_envs_r2.numel() > 0:
         #     closed_position = 0.0  # or whatever your closed position should be
