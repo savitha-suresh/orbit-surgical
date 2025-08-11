@@ -291,7 +291,7 @@ class PhaseDetector:
                         (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
                      )
                     
-                    & (~obj_above_ground)
+                    & (obj_above_ground)
                 )
 
             # PHASE 1: GRIP_1_OPEN
