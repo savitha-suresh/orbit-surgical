@@ -25,8 +25,9 @@ class Phases(Enum):
     LIFT = 5
     # R1 reaches goal 1
     REACH_GOAL_1 = 6
+    REACH_P1_R2 = 7
 
-    REACH_OBJ_R2 = 7
+    # REACH_OBJ_R2 = 7
     # R1 grips 1
     # until r1 opens the gripper
     # GRIP_1_OPEN_R2 = 8
@@ -154,7 +155,9 @@ class PhaseDetector:
         gripper_width_r2 = self.get_gripper_width(robot_2)
         obj_above_ground = self.is_object_above_ground()      # (num_envs,)
         p1_pos = self.env.get_p1_pos(obj_position)
+        p1_pos_r2 = self.env.get_p1_pos_r2()
         ee1_p1_dist = self._get_distance(ee_1_pos, p1_pos)
+        ee2_p1_dist = self._get_distance(ee_2_pos, p1_pos_r2)
         ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)
         ee2_obj_dist = self._get_distance(ee_2_pos, obj_grip_pos_r2)
 
@@ -283,16 +286,23 @@ class PhaseDetector:
         )
 
 
-        phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
-                    (
-                        (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
-                     (ee2_obj_dist > self.CLOSE_THRESHOLD) &
-                        ~self.env.not_visited_mask[:, Phases.LIFT.value] & 
-                        (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
-                     )
+        phase_mask[:, Phases.REACH_P1_R2.value] = (
+            (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+            (ee2_p1_dist > self.CLOSE_THRESHOLD) &
+            ~self.env.not_visited_mask[:, Phases.LIFT.value] & 
+            (obj_above_ground)
+        )
+
+        # phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
+        #             (
+        #                 (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #              (ee2_obj_dist > self.CLOSE_THRESHOLD) &
+        #                 ~self.env.not_visited_mask[:, Phases.LIFT.value] & 
+        #                 (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
+        #              )
                     
-                    & (obj_above_ground)
-                )
+        #             & (obj_above_ground)
+        #         )
 
             # PHASE 1: GRIP_1_OPEN
         # phase_mask[:, Phases.GRIP_1_OPEN_R2.value] = (

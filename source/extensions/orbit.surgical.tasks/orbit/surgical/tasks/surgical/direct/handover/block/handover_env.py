@@ -93,7 +93,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.goal_markers = VisualizationMarkers(self.cfg.p1_pos_cfg)
         self.goal_markers_obj = VisualizationMarkers(self.cfg.obj_pos_cfg)
         self.markers_goal = VisualizationMarkers(self.cfg.goal_pos_cfg)
-        self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
+        # self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
         self.grip_tgt_marker = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg)
         self.grip_lnk_marker = VisualizationMarkers(self.cfg.grip_lnk_pos_cfg)
         self.tip_1_marker = VisualizationMarkers(self.cfg.tip_1_cfg)
@@ -104,7 +104,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.tip_2_marker_r2 = VisualizationMarkers(self.cfg.tip_2_cfg_r2)
         self.grp_pt_1_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_1_cfg_r2)
         self.grp_pt_2_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_2_cfg_r2)
-        self.ee_tgt_marker_r2 = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg_r2)
+        
+        
+        self.p1_pos_marker_r2 = VisualizationMarkers(self.cfg.p1_pos_r2)
 
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
@@ -138,7 +140,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.markers_goal.visualize(goal_pos)
 
 
-        self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
+        # self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
         self.grip_tgt_marker.visualize(self.get_obj_griplnk_tgt_pos())
         self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
         grip_pos = self.get_gripper_tip_positions(self.robot_1)
@@ -150,7 +152,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.grp_pt_2_marker.visualize(grip_end_pts[1])
 
 
-        self.ee_tgt_marker_r2.visualize(self.get_obj_grip_pos_r2())
+        self.p1_pos_marker_r2.visualize(self.get_p1_pos_r2())
         grip_pos_r2 = self.get_gripper_tip_positions(self.robot_2)
         
         self.tip_1_marker_r2.visualize(grip_pos_r2[0])
@@ -793,6 +795,22 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         return p1_pos
     
+    def get_p1_pos_r2(self, approach_angle=-225): 
+        """
+        Create P1 at 45-degree approach angle
+        """
+        angle_rad = torch.deg2rad(torch.tensor(approach_angle))
+        
+        # Distance from object (adjust this based on your needs)
+        approach_distance = 0.1  # 5cm approach distance
+        
+        # Calculate P1 position at 45-degree angle
+        p1_pos = self.scene.env_origins.clone()
+        p1_pos[:, 0] += approach_distance * torch.cos(angle_rad)  # X offset
+        p1_pos[:, 2] += approach_distance * torch.sin(angle_rad)  # Z offset (height)
+        
+        return p1_pos
+    
 
     def get_goal_pos(self, obj_position, approach_angle=-215): 
         """
@@ -846,6 +864,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         ee_1 = self._get_ee_position(self.robot_1)
         ee_2 = self._get_ee_position(self.robot_2)
         p1_pos = self.get_p1_pos(obj_pos)
+        p1_pos_r2 = self.get_p1_pos_r2()
         goal_pos = self.get_goal_pos(obj_pos)
         gripper_link_pos = self.get_gripper_link_pos(self.robot_1)
         gripper_link_tgt = self.get_gripper_link_target_pos()
@@ -865,6 +884,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards_2 = torch.zeros((num_envs, num_phases), device=device)
 
         dist_p1_ee = torch.norm(p1_pos - ee_1, dim=-1)
+
+        dist_p1_ee_r2 = torch.norm(p1_pos_r2 - ee_2, dim=-1)
         
         rewards[:, Phases.REACH_P1.value] = torch.where(
                             self.not_visited_mask[:, Phases.REACH_P1.value],
@@ -1007,21 +1028,30 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
 
         mask_ro_r2 = (dist_goal1 <= self.phase_detector.CLOSE_THRESHOLD) & (self.not_visited_mask[env_ids, Phases.REACH_GOAL_1.value] 
-                    & (phases_one_hot[env_ids, Phases.REACH_OBJ_R2.value].bool()))
+                    & (phases_one_hot[env_ids, Phases.REACH_P1_R2.value].bool()))
         self.not_visited_mask[mask_ro_r2, Phases.REACH_GOAL_1.value] = False
-        rewards_2[mask_ro_r2, Phases.REACH_OBJ_R2.value] += 2000
+        rewards_2[mask_ro_r2, Phases.REACH_P1_R2.value] += 2000
+        
+
+        rewards_2[:, Phases.REACH_P1_R2.value] = torch.where(
+                            self.not_visited_mask[:, Phases.REACH_P1_R2.value],
+                            2 * torch.exp(-50 * dist_p1_ee_r2) ,
+                            rewards_2[:, Phases.REACH_P1_R2.value]  # leave existing reward unchanged
+                        )
+
+
         #print("rew", rewards)
         # phase 0: REACH_OBJ
-        dist_obj_ee_2 = torch.norm(obj_pos_r2 - ee_2, dim=-1)
-        dist_obj_griplnk_r2 = torch.norm(obj_griplink_pos_r2 - gripper_link_pos_r2, dim=-1)
-        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
-                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
-                            2* torch.exp(-50 * dist_obj_ee_2) ,
-                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
-        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
-                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
-                            2* torch.exp(-50 * dist_obj_griplnk_r2) ,
-                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        # dist_obj_ee_2 = torch.norm(obj_pos_r2 - ee_2, dim=-1)
+        # dist_obj_griplnk_r2 = torch.norm(obj_griplink_pos_r2 - gripper_link_pos_r2, dim=-1)
+        # rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+        #                     self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+        #                     2* torch.exp(-50 * dist_obj_ee_2) ,
+        #                     rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        # rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+        #                     self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+        #                     2* torch.exp(-50 * dist_obj_griplnk_r2) ,
+        #                     rewards_2[:, Phases.REACH_OBJ_R2.value] )
         
         # gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
         # log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)

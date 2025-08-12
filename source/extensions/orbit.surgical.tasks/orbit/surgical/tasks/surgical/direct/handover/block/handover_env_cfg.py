@@ -252,16 +252,7 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
                 },
             )
     
-    ee_tgt_pos_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
-                prim_path="/Visuals/goal_marker",
-                markers={
-                    "goal": sim_utils.SphereCfg(
-                        radius=0.003,
-                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((0.9, 0.8, 0.9))),
-                    ),
-                },
-            )
-    
+ 
     grip_lnk_pos_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
                 prim_path="/Visuals/goal_marker",
                 markers={
@@ -348,12 +339,12 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
                 },
             )
     
-    ee_tgt_pos_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+    p1_pos_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
                 prim_path="/Visuals/goal_marker",
                 markers={
                     "goal": sim_utils.SphereCfg(
-                        radius=0.003,
-                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=((0.9, 0.8, 0.9))),
+                        radius=0.005,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.4, 0.3, 1.0)),
                     ),
                 },
             )
