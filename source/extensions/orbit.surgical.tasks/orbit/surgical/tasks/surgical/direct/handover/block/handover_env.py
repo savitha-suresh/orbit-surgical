@@ -520,13 +520,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         active_r2_envs = r2_mask.nonzero(as_tuple=True)[0]
 
-        if active_r2_envs.numel() > 0:
+        
             # Get current positions
-            self.robot_2.set_joint_position_target(
-                self.robot_2_curr_targets[active_r2_envs][:, self.actuated_dof_indices],
-                env_ids=active_r2_envs,
-                joint_ids=self.actuated_dof_indices
-            )
+        self.robot_2.set_joint_position_target(
+            self.robot_2_curr_targets[:, self.actuated_dof_indices],
+            joint_ids=self.actuated_dof_indices
+        )
 
         # if global_grip_envs_r2.numel() > 0:
         #     closed_position = 0.0  # or whatever your closed position should be
@@ -1033,11 +1032,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards_2[mask_ro_r2, Phases.REACH_P1_R2.value] += 2000
         
 
-        rewards_2[:, Phases.REACH_P1_R2.value] = torch.where(
-                            self.not_visited_mask[:, Phases.REACH_P1_R2.value],
-                            2 * torch.exp(-50 * dist_p1_ee_r2) ,
-                            rewards_2[:, Phases.REACH_P1_R2.value]  # leave existing reward unchanged
-                        )
+        rewards_2 += 2 * torch.exp(-50 * dist_p1_ee_r2)[:, None]
+                           
 
 
         #print("rew", rewards)
