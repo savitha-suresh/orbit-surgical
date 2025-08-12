@@ -145,13 +145,18 @@ class EvaluationMetrics:
             'z_std': float(torch.std(positions[:, 2]))
         }
 
-    def update_phase_data(self, not_visited_mask: torch.Tensor, timestep: int):
+    def update_phase_data(self, not_visited_mask: torch.Tensor, timestep: int, goal_dist):
         for phase_idx in range(self.num_phases):
             newly_reached = ~not_visited_mask[:, phase_idx]
             for env_idx in range(self.num_envs):
                 if newly_reached[env_idx] and self.episode_data['phase_reached_timesteps'][env_idx, phase_idx] == -1:
                     self.episode_data['phase_reached_timesteps'][env_idx, phase_idx] = timestep
                     self.episode_data['phase_reached_count'][env_idx, phase_idx] = 1
+            for env_idx in range(self.num_envs):
+                if goal_dist[env_idx] < 0.02:
+                    self.episode_data['phase_reached_timesteps'][env_idx, 6] = timestep
+                    self.episode_data['phase_reached_count'][env_idx, 6] = 1
+
 
 
     def update_height_data(self, obj_positions: torch.Tensor, timestep: int):
@@ -429,7 +434,8 @@ def main():
                 metrics.store_initial_positions(initial_obj_positions , newly_done)
                     
                 current_not_visited_mask = env.unwrapped.not_visited_mask.cpu()
-                metrics.update_phase_data(current_not_visited_mask, timestep)
+                goal_dist = env.unwrapped.get_goal_ee1_dist().cpu()
+                metrics.update_phase_data(current_not_visited_mask, timestep, goal_dist)
             
                 current_obj_positions = env.unwrapped.get_abs_obj_pos().cpu()
                 metrics.update_height_data(current_obj_positions, timestep)
