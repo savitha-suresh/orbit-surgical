@@ -518,13 +518,13 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         active_r2_envs = r2_mask.nonzero(as_tuple=True)[0]
 
-        # if active_r2_envs.numel() > 0:
-        #     # Get current positions
-        #     self.robot_2.set_joint_position_target(
-        #         self.robot_2_curr_targets[active_r2_envs[:, None], self.actuated_dof_indices],
-        #         env_ids=active_r2_envs,
-        #         joint_ids=self.actuated_dof_indices
-        #     )
+        if active_r2_envs.numel() > 0:
+            # Get current positions
+            self.robot_2.set_joint_position_target(
+                self.robot_2_curr_targets[active_r2_envs][:, self.actuated_dof_indices],
+                env_ids=active_r2_envs,
+                joint_ids=self.actuated_dof_indices
+            )
 
         # if global_grip_envs_r2.numel() > 0:
         #     closed_position = 0.0  # or whatever your closed position should be
@@ -1023,8 +1023,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             2* torch.exp(-50 * dist_obj_griplnk_r2) ,
                             rewards_2[:, Phases.REACH_OBJ_R2.value] )
         
-        gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
-        log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)
+        # gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
+        # log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)
         #
         
         # mask_grip_r2 = ((dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
@@ -1121,7 +1121,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         final_rewards_r2 = torch.sum(phases_one_hot * rewards_2  , dim=1)
         final_rewards_r2[phase_regressed_mask] += self.cfg.phase_regressed_penalty
         log_if(not self.cfg.is_training, "visited", self.not_visited_mask)
-        log_if(not self.cfg.is_training, f"rewards {final_rewards_r1} rewards_all {rewards}")
+        log_if(not self.cfg.is_training, f"rewards_final {final_rewards_r1} rewards 1 {rewards}")
+        log_if(not self.cfg.is_training, f"rewards 2 {rewards_2}")
         
         return {
             "robot_1": final_rewards_r1,
