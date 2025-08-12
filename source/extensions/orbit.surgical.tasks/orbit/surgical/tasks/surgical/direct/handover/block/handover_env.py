@@ -971,6 +971,14 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return (ee_pos[:, 0] >= x_min) & (ee_pos[:, 0] <= x_max)
 
 
+    def get_goal_ee1_dist(self):
+        obj_pos = self._get_obj_pos() 
+        goal_pos = self.get_goal_pos(obj_pos)
+        ee_1 = self._get_ee_position(self.robot_1)
+        dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
+        return dist_goal1
+
+
     def _get_rewards(self):
         phases_one_hot, phase_indices, phase_regressed_mask, phase_same_mask = self._get_phase()  # shape (num_envs, num_phases)
         num_envs, num_phases = phases_one_hot.shape
