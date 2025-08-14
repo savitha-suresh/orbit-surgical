@@ -506,18 +506,6 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 joint_ids=self.actuated_dof_indices
             )
 
-        inactive_r1_envs = r2_mask.nonzero(as_tuple=True)[0]
-
-        if inactive_r1_envs.numel() > 0:
-            # Get current positions
-            qpos_r1 = self.robot_1.data.joint_pos[inactive_r1_envs][:, self.actuated_dof_indices]
-            # Keep them as targets
-            self.robot_1.set_joint_position_target(
-                qpos_r1,
-                env_ids=inactive_r1_envs,
-                joint_ids=self.actuated_dof_indices
-            )
-
         active_r2_envs = r2_mask.nonzero(as_tuple=True)[0]
 
         
@@ -1020,7 +1008,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards[mask_reach1, Phases.REACH_GOAL_1.value] += 2000
 
         dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
-        rewards[:, Phases.REACH_GOAL_1.value] += 2 * torch.exp(-50 * dist_goal1)
+        rewards[:, Phases.REACH_GOAL_1.value:] += 2 * torch.exp(-50 * dist_goal1)[:, None]
         
 
 
