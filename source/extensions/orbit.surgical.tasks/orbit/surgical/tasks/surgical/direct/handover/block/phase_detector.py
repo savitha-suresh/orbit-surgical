@@ -290,7 +290,7 @@ class PhaseDetector:
 
         phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
                     
-                        (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+                        ((ee1_goal_dist <= self.CLOSE_THRESHOLD) | ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
                         ((ee2_p1_dist <= self.CLOSE_THRESHOLD) | (
                             (ee2_p1_dist <= 0.1) & (prev_phases[:, Phases.REACH_OBJ_R2.value])
                         ) &
