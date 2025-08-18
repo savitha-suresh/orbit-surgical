@@ -56,9 +56,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
 
         self.r1_init_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
-        self.r1_init_pos[:, :] = torch.tensor([0.18, 0.0, 0.15], device=self.device)
+        self.r1_init_pos[:, :] = torch.tensor([0.15, 0.0, 0.15], device=self.device)
         self.r2_init_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
-        self.r2_init_pos[:, :] = torch.tensor([-0.18, 0.0, 0.15], device=self.device)
+        self.r2_init_pos[:, :] = torch.tensor([-0.15, 0.0, 0.15], device=self.device)
         self.current_phases = torch.zeros((self.num_envs, len(Phases)), dtype=torch.float, device=self.device)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
 
@@ -333,7 +333,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # 5. Normalized direction vectors
         ee_to_obj_dir = ee_to_obj / (ee_to_obj_distance + 1e-8)
 
-        grip_pos = self.get_gripper_tip_positions(self.robot_1)
+        grip_pos = self.get_gripper_tip_positions(robot)
         grp_tgt_pos = self.get_gripper_target_points_r2()
         grp1_tgt_pos = grp_tgt_pos[0]
         grp2_tgt_pos = grp_tgt_pos[1]
@@ -576,7 +576,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w         # (N, 4)
         
-        local_offset = torch.tensor([[0.003, 0.01, 0.02]], device=base_pos.device)  # (1, 3)
+        local_offset = torch.tensor([[0.0,0.0, 0.02]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1) 
         rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
@@ -646,7 +646,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w          # (N, 3)
         base_rot = self.object.data.root_quat_w          # (N, 4)
         # x,y are for the needle
-        local_offset = torch.tensor([[0.003, 0.01, 0]], device=base_pos.device)  # (1, 3)
+        local_offset = torch.tensor([[0.00, 0.0, 0]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1)
 
@@ -663,7 +663,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_pos = self.object.data.root_pos_w          # (N, 3)
         base_rot = self.object.data.root_quat_w          # (N, 4)
         # x,y are for the needle
-        local_offset = torch.tensor([[0.003, -0.01, 0]], device=base_pos.device)  # (1, 3)
+        local_offset = torch.tensor([[0.01  , -0.017, 0]], device=base_pos.device)  # (1, 3)
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1)
 
@@ -794,6 +794,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # Calculate P1 position at 45-degree angle
         p1_pos = self.scene.env_origins.clone()
         p1_pos[:, 0] += approach_distance * torch.cos(angle_rad)  # X offset
+        p1_pos[:, 1]+= 0.02
         p1_pos[:, 2] += approach_distance * torch.sin(angle_rad)  # Z offset (height)
         
         return p1_pos
