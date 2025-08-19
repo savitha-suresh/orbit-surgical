@@ -159,7 +159,7 @@ class PhaseDetector:
         ee1_p1_dist = self._get_distance(ee_1_pos, p1_pos)
         ee2_p1_dist = self._get_distance(ee_2_pos, p1_pos_r2)
         ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)
-        ee2_obj_dist = self._get_distance(ee_2_pos, obj_grip_pos_r2)
+        ee2_obj_dist = self._get_distance(ee_2_pos, obj_pos_r2)
 
         ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
         ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
@@ -295,8 +295,7 @@ class PhaseDetector:
                             (ee2_p1_dist <= 0.1) & (prev_phases[:, Phases.REACH_OBJ_R2.value])
                         ) &
                      (ee2_obj_dist > self.CLOSE_THRESHOLD) &
-                        ~self.env.not_visited_mask[:, Phases.LIFT.value] & 
-                        (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
+                        ~self.env.not_visited_mask[:, Phases.LIFT.value]
                      )
                     
                     
