@@ -104,7 +104,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.tip_2_marker_r2 = VisualizationMarkers(self.cfg.tip_2_cfg_r2)
         self.grp_pt_1_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_1_cfg_r2)
         self.grp_pt_2_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_2_cfg_r2)
-        
+        self.obj_marker_r2 = VisualizationMarkers(self.cfg.obj_pos_cfg_r2)
         
         self.p1_pos_marker_r2 = VisualizationMarkers(self.cfg.p1_pos_r2)
 
@@ -160,6 +160,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         grip_end_pts_r2 = self.get_gripper_target_points_r2()
         self.grp_pt_1_marker_r2.visualize(grip_end_pts_r2[0])
         self.grp_pt_2_marker_r2.visualize(grip_end_pts_r2[1])
+        self.obj_marker_r2.visualize(self._get_obj_pos_r2())
 
         
 
@@ -588,17 +589,32 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def get_obj_pos_r2(self):
         return self._get_obj_pos_r2()
     
-    def _get_obj_pos_r2(self):
+    # def _get_obj_pos_r2(self):
+    #     base_pos = self.object.data.root_pos_w         # (N, 3)
+    #     base_rot = self.object.data.root_quat_w         # (N, 4)
+        
+    #     local_offset = torch.tensor([[0.01  , -0.017, 0.02]], device=base_pos.device)  # (1, 3)
+    #     N = base_pos.shape[0]
+    #     local_offset = local_offset.expand(N, -1) 
+    #     rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
+        
+    #     offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+    #     return base_pos + offset_world
+    
+    def _get_obj_pos_r2(self, lift_height=0.02):
         base_pos = self.object.data.root_pos_w         # (N, 3)
-        base_rot = self.object.data.root_quat_w         # (N, 4)
-        
-        local_offset = torch.tensor([[-0.003, -0.01, 0.02]], device=base_pos.device)  # (1, 3)
-        N = base_pos.shape[0]
-        local_offset = local_offset.expand(N, -1) 
-        rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
-        
-        offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
-        return base_pos + offset_world
+        base_rot = self.object.data.root_quat_w        # (N, 4)
+
+        # Local XY offset (rotates with object)
+        local_xy_offset = torch.tensor([[0.01, -0.017, 0.0]], device=base_pos.device)
+        local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
+
+        rot_mat = quat_to_matrix(base_rot)
+        offset_xy_world = torch.bmm(rot_mat, local_xy_offset.unsqueeze(-1)).squeeze(-1)
+
+        # Add world Z lift on top
+        return base_pos + offset_xy_world + torch.tensor([0, 0, lift_height], device=base_pos.device)
+
     
 
     def get_dist_toadjust_griplink(self):
@@ -1055,16 +1071,18 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards_2[mask_ro_r2, Phases.REACH_OBJ_R2.value] += 2000
         
         dist_obj_ee_2 = torch.norm(obj_pos_r2 - ee_2, dim=-1)
-        dist_obj_griplnk_r2 = torch.norm(obj_griplink_pos_r2 - gripper_link_pos_r2, dim=-1)
-        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
-                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
-                            2* torch.exp(-50 * dist_obj_ee_2) ,
-                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
-        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
-                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
-                            2* torch.exp(-50 * dist_obj_griplnk_r2) ,
-                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        # dist_obj_griplnk_r2 = torch.norm(obj_griplink_pos_r2 - gripper_link_pos_r2, dim=-1)
+        # rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+        #                     self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+        #                     2* torch.exp(-50 * dist_obj_ee_2) ,
+        #                     rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        # rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+        #                     self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+        #                     2* torch.exp(-50 * dist_obj_griplnk_r2) ,
+        #                     rewards_2[:, Phases.REACH_OBJ_R2.value] )
         
+        active_r2 = ~self.not_visited_mask[:, Phases.REACH_GOAL_1.value]  # i.e. after GOAL_1 visited
+        rewards_2[active_r2, Phases.REACH_OBJ_R2.value] += 2 * torch.exp(-50 * dist_obj_ee_2[active_r2])
         # gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
         # log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)
         #

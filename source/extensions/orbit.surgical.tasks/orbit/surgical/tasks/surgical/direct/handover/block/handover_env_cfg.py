@@ -348,6 +348,16 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
                     ),
                 },
             )
+    
+    obj_pos_cfg_r2: VisualizationMarkersCfg = VisualizationMarkersCfg(
+                prim_path="/Visuals/goal_marker",
+                markers={
+                    "goal": sim_utils.SphereCfg(
+                        radius=0.003,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.5, 0.0)),
+                    ),
+                },
+            )
 
     # Constants for logic (used in reward, reset, etc.)
     ee_link_name: str = "psm_tool_tip_link"
