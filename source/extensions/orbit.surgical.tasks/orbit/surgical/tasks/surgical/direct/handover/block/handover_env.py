@@ -107,6 +107,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.obj_marker_r2 = VisualizationMarkers(self.cfg.obj_pos_cfg_r2)
         
         self.p1_pos_marker_r2 = VisualizationMarkers(self.cfg.p1_pos_r2)
+        self.grip_tgt_marker_r2 = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg_r2)
 
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
@@ -161,6 +162,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.grp_pt_1_marker_r2.visualize(grip_end_pts_r2[0])
         self.grp_pt_2_marker_r2.visualize(grip_end_pts_r2[1])
         self.obj_marker_r2.visualize(self._get_obj_pos_r2())
+        self.grip_tgt_marker_r2.visualize(self.get_obj_griplnk_tgt_pos_r2())
 
         
 
@@ -643,18 +645,32 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         return grip_pos_adjusted
     
+    # def get_obj_griplnk_tgt_pos_r2(self):
+    #     # Get base grip point (already rotation-aware)
+    #     grip_pos = self._get_obj_pos_r2()
+
+    #     # Get object orientation
+    #     base_rot = self.object.data.root_quat_w         # (N, 4)
+    #     rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
+    #     z_axis = rot_mat[:, :, 2]                      # Object's local Z in world
+
+    #     # Get vertical offset based on gripper
+    #     dist_offset = self.get_dist_toadjust_griplink_r2()  # (N,)
+    #     grip_pos_adjusted = grip_pos + z_axis * dist_offset.unsqueeze(-1)
+
+    #     return grip_pos_adjusted
+
+
     def get_obj_griplnk_tgt_pos_r2(self):
-        # Get base grip point (already rotation-aware)
+    # Base approach point (already XY-rotated + world-Z lifted)
         grip_pos = self._get_obj_pos_r2()
 
-        # Get object orientation
-        base_rot = self.object.data.root_quat_w         # (N, 4)
-        rot_mat = quat_to_matrix(base_rot)             # (N, 3, 3)
-        z_axis = rot_mat[:, :, 2]                      # Object's local Z in world
+        # Use world Z instead of object Z
+        world_z = torch.tensor([0, 0, 1.0], device=grip_pos.device).expand(grip_pos.shape[0], -1)
 
-        # Get vertical offset based on gripper
+        # Vertical offset for gripper link
         dist_offset = self.get_dist_toadjust_griplink_r2()  # (N,)
-        grip_pos_adjusted = grip_pos + z_axis * dist_offset.unsqueeze(-1)
+        grip_pos_adjusted = grip_pos + world_z * dist_offset.unsqueeze(-1)
 
         return grip_pos_adjusted
     
@@ -683,7 +699,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         N = base_pos.shape[0]
         local_offset = local_offset.expand(N, -1)
 
-        # Convert quaternion to rotation matrix
+        # # Convert quaternion to rotation matrix
         rot_mat = quat_to_matrix(base_rot)              # (N, 3, 3)
 
         # Apply offset in object local frame
