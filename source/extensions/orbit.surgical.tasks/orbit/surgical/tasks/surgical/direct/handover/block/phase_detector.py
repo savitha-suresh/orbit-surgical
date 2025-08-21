@@ -286,21 +286,20 @@ class PhaseDetector:
         )
 
 
-        
+        p1_pts = self.env.get_p1_pos_r2_3()
+        p1_l = p1_pts[-1]
+        dist_p1_l = self._get_distance(ee_2_pos, p1_l)
 
         phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
                     
                         ((ee1_goal_dist <= self.CLOSE_THRESHOLD) | ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
-                        ((ee2_p1_dist <= self.CLOSE_THRESHOLD) | (
-                            (ee2_p1_dist <= 0.1) & (prev_phases[:, Phases.REACH_OBJ_R2.value])
-                        ) &
+                        ((dist_p1_l <= self.CLOSE_THRESHOLD) | (
+                            (dist_p1_l <= 0.05) & (prev_phases[:, Phases.REACH_OBJ_R2.value])
+                        )) &
                      (ee2_obj_dist > self.CLOSE_THRESHOLD) &
-                        ~self.env.not_visited_mask[:, Phases.LIFT.value]
+                        ~self.env.not_visited_mask[:, Phases.LIFT.value] & 
+                        (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD) & (obj_above_ground)
                      )
-                    
-                    
-                
-        )
 
             # PHASE 1: GRIP_1_OPEN
         # phase_mask[:, Phases.GRIP_1_OPEN_R2.value] = (
