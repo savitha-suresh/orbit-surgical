@@ -845,7 +845,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         angle_rad = torch.deg2rad(torch.tensor(approach_angle))
         p1_points = []
         obj_pos = self.get_obj_pos_r2()
-        goal_pos = self.get_goal_pos(obj_pos).clone()
+        goal_pos = self.get_goal_pos(obj_pos)
         approach_distance = 0.14
         for _ in range(3):
 
@@ -853,7 +853,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
             approach_distance = approach_distance - 0.03 # 5cm approach distance
             
             # Calculate P1 position at 45-degree angle
-            p1_pos = goal_pos
+            p1_pos = goal_pos.clone()
             p1_pos[:, 0] += approach_distance * torch.cos(angle_rad)  # X offset
             p1_pos[:, 2] += approach_distance * torch.sin(angle_rad)  # Z offset (height)
             p1_points.append(p1_pos)
