@@ -56,6 +56,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
 
         self.r1_init_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
+        self.obj_og_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         self.r1_init_pos[:, :] = torch.tensor([0.15, 0.0, 0.15], device=self.device)
         self.r2_init_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         self.r2_init_pos[:, :] = torch.tensor([-0.15, 0.0, 0.15], device=self.device)
@@ -853,18 +854,18 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return p1_points
     
 
-    def get_goal_pos(self, obj_position, approach_angle=-215): 
+    def get_goal_pos(self, obj_position, approach_angle=-225): 
         """
         Create P1 at 45-degree approach angle
         """
         # angle_rad = torch.deg2rad(torch.tensor(approach_angle))
         
         # # Distance from object (adjust this based on your needs)
-        # approach_distance = 0.03  # 5cm approach distance
         
+       
         num_envs = obj_position.shape[0]
-        goal_position = torch.tensor([-0.01, 0.01, 0.02], device=obj_position.device).unsqueeze(0)  # shape (1, 3)
-        goal_position = goal_position + self.scene.env_origins  # shape (num_envs, 3)
+        goal_position = torch.tensor([-0.02, -0.02, 0.03], device=obj_position.device).unsqueeze(0)  # shape (1, 3)
+        goal_position = goal_position + self.obj_og_pos.clone()  # shape (num_envs, 3)
         return goal_position 
         
         
@@ -1241,6 +1242,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         super()._reset_idx(env_ids)
        
         self.phase_regressed_mask = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
+        self.obj_og_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         # Set to True — all phases are not visited initially
         self.not_visited_mask = torch.ones((self.num_envs, len(Phases)), dtype=torch.bool, device=self.device)
         # In __init__ or reset()
@@ -1292,6 +1294,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         
         self.object.write_root_pose_to_sim(torch.cat((new_pos, new_rot), dim=-1), env_ids)
+        self.obj_og_pos[:, :2] = self.get_abs_obj_pos()[:, :2]
         
         self.count = 0
         
