@@ -108,6 +108,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.obj_marker_r2 = VisualizationMarkers(self.cfg.obj_pos_cfg_r2)
         
         self.p1_pos_marker_r2 = VisualizationMarkers(self.cfg.p1_pos_r2)
+        self.p1_pos_marker_r2_0 = VisualizationMarkers(self.cfg.p1_pos_r2_0)
+        self.p1_pos_marker_r2_1 = VisualizationMarkers(self.cfg.p1_pos_r2_1)
+        self.p1_pos_marker_r2_2 = VisualizationMarkers(self.cfg.p1_pos_r2_2)
         self.grip_tgt_marker_r2 = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg_r2)
 
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
@@ -155,6 +158,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
 
         self.p1_pos_marker_r2.visualize(self.get_p1_pos_r2())
+        p1_pts = self.get_p1_pos_r2_3()
+        self.p1_pos_marker_r2_0.visualize(p1_pts[0])
+        self.p1_pos_marker_r2_1.visualize(p1_pts[1])
+        self.p1_pos_marker_r2_2.visualize(p1_pts[2])
         grip_pos_r2 = self.get_gripper_tip_positions(self.robot_2)
         
         self.tip_1_marker_r2.visualize(grip_pos_r2[0])
