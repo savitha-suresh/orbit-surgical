@@ -26,7 +26,7 @@ class Phases(Enum):
     # R1 reaches goal 1
     REACH_GOAL_1 = 6
     REACH_OBJ_R2 = 7
-
+    REACH_GRIP_R2 = 8
     # REACH_OBJ_R2 = 7
     # R1 grips 1
     # until r1 opens the gripper
@@ -164,6 +164,7 @@ class PhaseDetector:
         ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
         ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
         ee1_obj_grip_dist = self._get_distance(ee_1_pos, obj_grip_pos)
+        ee2_obj_grip_dist = self._get_distance(ee_2_pos, obj_grip_pos_r2)
         grip_link_tgt_dist = self._get_distance(grip_lnk_pos, grip_lnk_tgt_pos)
         obj_grip_link_tg_dist = self._get_distance(obj_grip_tgt_pos, grip_lnk_pos)
         grp_tgt_dist = self.env.get_grp_tgt_distance(robot_1)
@@ -291,7 +292,6 @@ class PhaseDetector:
         dist_p1_l = self._get_distance(ee_2_pos, p1_l)
 
         phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
-                    
                         ((ee1_goal_dist <= self.CLOSE_THRESHOLD) | ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
                         ((dist_p1_l <= self.CLOSE_THRESHOLD) | (
                              (prev_phases[:, Phases.REACH_OBJ_R2.value])
@@ -299,6 +299,15 @@ class PhaseDetector:
                      (ee2_obj_dist > self.CLOSE_THRESHOLD) &
                         ~self.env.not_visited_mask[:, Phases.LIFT.value] & (obj_above_ground) &
                         (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
+                     )
+
+        phase_mask[:, Phases.REACH_GRIP_R2.value] =  (
+                        ( ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
+                     (ee2_obj_dist <= self.CLOSE_THRESHOLD) &
+                        ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value] & (obj_above_ground) &
+                        (obj_grip_link_tg_dist_r2 <= self.CLOSE_THRESHOLD) & 
+                        (ee2_obj_grip_dist > self.CLOSE_THRESHOLD)
+
                      )
 
             # PHASE 1: GRIP_1_OPEN

@@ -611,7 +611,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     #     offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
     #     return base_pos + offset_world
     
-    def _get_obj_pos_r2(self, lift_height=0.02):
+    def _get_obj_pos_r2(self, lift_height=0.05):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
@@ -986,7 +986,9 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
         # phase 1: GRIP_1_OPEN
         gripper_width = self.phase_detector.get_gripper_width(self.robot_1)
+        gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
         log_if(not self.cfg.is_training, "gripper width", gripper_width)
+        log_if(not self.cfg.is_training, "r2 gripper width", gripper_width_r2)
         #
         
         mask_ro = ((dist_obj_ee <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
@@ -1139,21 +1141,26 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             2* torch.exp(-50 * dist_obj_griplnk_r2) ,
                             rewards_2[:, Phases.REACH_OBJ_R2.value] )
         
-        # active_r2 = ~self.not_visited_mask[:, Phases.REACH_GOAL_1.value]  # i.e. after GOAL_1 visited
-        # rewards_2[active_r2, Phases.REACH_OBJ_R2.value] += 2 * torch.exp(-50 * dist_obj_ee_2[active_r2])
-        # rewards_2[active_r2, Phases.REACH_OBJ_R2.value] += 2 * torch.exp(-50 * dist_obj_griplnk_r2[active_r2])
-        # gripper_width_r2 = self.phase_detector.get_gripper_width(self.robot_2)
-        # log_if(not self.cfg.is_training, "gripper width r2", gripper_width_r2)
-        #
+      
         
-        # mask_grip_r2 = ((dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
-        #         (dist_obj_griplnk_r2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD)) &  (
-        #             self.not_visited_mask[env_ids, Phases.REACH_OBJ_R2.value] & 
-        #             (phases_one_hot[env_ids, Phases.GRIP_1_OPEN_R2.value].bool()))
+        mask_grip_r2 = ((dist_obj_ee_2 <= self.phase_detector.CLOSE_THRESHOLD) & 
+                (dist_obj_griplnk_r2 <= self.phase_detector.CLOSE_THRESHOLD)) &  (
+                    self.not_visited_mask[env_ids, Phases.REACH_OBJ_R2.value] & 
+                    (phases_one_hot[env_ids, Phases.REACH_GRIP_R2.value].bool()))
 
         
-        # self.not_visited_mask[mask_grip_r2, Phases.REACH_OBJ_R2.value] = False
-        # rewards_2[mask_grip_r2, Phases.GRIP_1_OPEN_R2.value] += 2000
+        self.not_visited_mask[mask_grip_r2, Phases.REACH_OBJ_R2.value] = False
+        rewards[mask_grip_r2, Phases.REACH_GRIP_R2.value] += 2000
+        rewards_2[mask_grip_r2, Phases.REACH_GRIP_R2.value] += 2000
+
+
+        dist_obj_grip_ee_2 = torch.norm(obj_grip_pos_r2 - ee_2, dim=-1)
+        
+        rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
+                            2* torch.exp(-50 * dist_obj_grip_ee_2) ,
+                            rewards_2[:, Phases.REACH_GRIP_R2.value] )
+
 
         # rewards_2[:, Phases.GRIP_1_OPEN_R2.value] += torch.where(
         #                     self.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value],
