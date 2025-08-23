@@ -297,7 +297,8 @@ class PhaseDetector:
                              (prev_phases[:, Phases.REACH_OBJ_R2.value])
                         )) &
                      (ee2_obj_dist > self.CLOSE_THRESHOLD) &
-                        ~self.env.not_visited_mask[:, Phases.LIFT.value] & (obj_above_ground)
+                        ~self.env.not_visited_mask[:, Phases.LIFT.value] & (obj_above_ground) &
+                        (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
                      )
 
             # PHASE 1: GRIP_1_OPEN

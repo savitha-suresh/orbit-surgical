@@ -611,7 +611,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     #     offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
     #     return base_pos + offset_world
     
-    def _get_obj_pos_r2(self, lift_height=0.005):
+    def _get_obj_pos_r2(self, lift_height=0.02):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
@@ -1134,10 +1134,10 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
                             2* torch.exp(-50 * dist_obj_ee_2) ,
                             rewards_2[:, Phases.REACH_OBJ_R2.value] )
-        # rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
-        #                     self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
-        #                     2* torch.exp(-50 * dist_obj_griplnk_r2) ,
-        #                     rewards_2[:, Phases.REACH_OBJ_R2.value] )
+        rewards_2[:, Phases.REACH_OBJ_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_OBJ_R2.value],
+                            2* torch.exp(-50 * dist_obj_griplnk_r2) ,
+                            rewards_2[:, Phases.REACH_OBJ_R2.value] )
         
         # active_r2 = ~self.not_visited_mask[:, Phases.REACH_GOAL_1.value]  # i.e. after GOAL_1 visited
         # rewards_2[active_r2, Phases.REACH_OBJ_R2.value] += 2 * torch.exp(-50 * dist_obj_ee_2[active_r2])
