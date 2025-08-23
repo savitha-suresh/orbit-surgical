@@ -611,7 +611,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
     #     offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
     #     return base_pos + offset_world
     
-    def _get_obj_pos_r2(self, lift_height=0.02):
+    def _get_obj_pos_r2(self, lift_height=0.005):
         base_pos = self.object.data.root_pos_w         # (N, 3)
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
