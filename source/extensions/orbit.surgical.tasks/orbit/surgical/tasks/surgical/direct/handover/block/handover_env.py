@@ -700,21 +700,37 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return base_pos + offset_world
     
     def get_obj_grip_pos_r2(self):
-        base_pos = self.object.data.root_pos_w          # (N, 3)
-        base_rot = self.object.data.root_quat_w          # (N, 4)
-        # x,y are for the needle
-        local_offset = torch.tensor([[0.01  , -0.017, 0]], device=base_pos.device)  # (1, 3)
-        N = base_pos.shape[0]
-        local_offset = local_offset.expand(N, -1)
 
-        # # Convert quaternion to rotation matrix
-        rot_mat = quat_to_matrix(base_rot)              # (N, 3, 3)
+        base_pos = self.object.data.root_pos_w         # (N, 3)
+        base_rot = self.object.data.root_quat_w        # (N, 4)
 
-        # Apply offset in object local frame
-        offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+        # Local XY offset (rotates with object)
+        local_xy_offset = torch.tensor([[0.01, -0.017, 0.0]], device=base_pos.device)
+        local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
 
-        # Add to base pos
-        return base_pos + offset_world
+        rot_mat = quat_to_matrix(base_rot)
+        offset_xy_world = torch.bmm(rot_mat, local_xy_offset.unsqueeze(-1)).squeeze(-1)
+
+        # Add world Z lift on top
+        return base_pos + offset_xy_world + torch.tensor([0, 0, 0.0], device=base_pos.device)
+
+    
+
+        # base_pos = self.object.data.root_pos_w          # (N, 3)
+        # base_rot = self.object.data.root_quat_w          # (N, 4)
+        # # x,y are for the needle
+        # local_offset = torch.tensor([[0.01  , -0.017, 0]], device=base_pos.device)  # (1, 3)
+        # N = base_pos.shape[0]
+        # local_offset = local_offset.expand(N, -1)
+
+        # # # Convert quaternion to rotation matrix
+        # rot_mat = quat_to_matrix(base_rot)              # (N, 3, 3)
+
+        # # Apply offset in object local frame
+        # offset_world = torch.bmm(rot_mat, local_offset.unsqueeze(-1)).squeeze(-1)  # (N, 3)
+
+        # # Add to base pos
+        # return base_pos + offset_world
 
     def get_obj_rotation(self):
         # Assuming self.peg is your RigidObject instance
@@ -1154,12 +1170,25 @@ class DualArmHandoverEnv(DirectMARLEnv):
         rewards_2[mask_grip_r2, Phases.REACH_GRIP_R2.value] += 2000
 
 
-        dist_obj_grip_ee_2 = torch.norm(obj_grip_pos_r2 - ee_2, dim=-1)
+        # dist_obj_grip_ee_2 = torch.norm(obj_grip_pos_r2 - ee_2, dim=-1)
+        
+        # rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
+        #                     self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
+        #                     2* torch.exp(-50 * dist_obj_grip_ee_2) ,
+        #                     rewards_2[:, Phases.REACH_GRIP_R2.value] )
+
+        dist_grp_tgt_r2 = self.get_grp_tgt_distance_r2(self.robot_2)
+        dist_grp1_tgt_r2, dist_grp2_tgt_r2 = dist_grp_tgt_r2
+        rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
+                            2* torch.exp(-100 * dist_grp1_tgt_r2) ,
+                            rewards_2[:, Phases.REACH_GRIP_R2.value] )
         
         rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
-                            2* torch.exp(-50 * dist_obj_grip_ee_2) ,
+                            2* torch.exp(-100 * dist_grp2_tgt_r2) ,
                             rewards_2[:, Phases.REACH_GRIP_R2.value] )
+       
 
 
         # rewards_2[:, Phases.GRIP_1_OPEN_R2.value] += torch.where(
