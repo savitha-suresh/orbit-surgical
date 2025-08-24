@@ -154,8 +154,8 @@ class DualArmHandoverEnvCfg(DirectMARLEnvCfg):
     possible_agents = ["robot_1", "robot_2"]
     # action - 7, obs - 33 in the manager
     action_spaces = {"robot_1": 8, "robot_2": 8}  # IK target delta pose
-    observation_spaces = {"robot_1": 73, "robot_2": 60}  # example dim (can be tuned)
-    state_space = 133 # combined
+    observation_spaces = {"robot_1": 74, "robot_2": 61}  # example dim (can be tuned)
+    state_space = 135 # combined
     ground_height=0.0149
     events: EventCfg = EventCfg()
     commands: CommandsCfg = CommandsCfg()

@@ -27,6 +27,7 @@ class Phases(Enum):
     REACH_GOAL_1 = 6
     REACH_OBJ_R2 = 7
     REACH_GRIP_R2 = 8
+    GRIP_1_CLOSE_R2 = 9
     # REACH_OBJ_R2 = 7
     # R1 grips 1
     # until r1 opens the gripper
