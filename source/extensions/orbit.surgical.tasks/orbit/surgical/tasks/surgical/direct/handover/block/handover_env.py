@@ -616,7 +616,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
         # Local XY offset (rotates with object)
-        local_xy_offset = torch.tensor([[0.01, -0.017, 0.0]], device=base_pos.device)
+        local_xy_offset = torch.tensor([[0.01, -0.01, 0.0]], device=base_pos.device)
         local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
 
         rot_mat = quat_to_matrix(base_rot)
@@ -773,18 +773,16 @@ class DualArmHandoverEnv(DirectMARLEnv):
         displacement = 0.5
         jaw_radius = 0.01
         world_disp = displacement * jaw_radius
-        
+
+        # Grip point (already correct wrt object)
         grip_pt = self.get_obj_grip_pos_r2()
-        obj_quat = self.get_obj_rotation()
-        peg_rot_mat = quat_to_matrix(obj_quat)         # (N, 3, 3)
 
-    #   
-        direction = peg_rot_mat[:, :, 0]  # (N, 3)
+        # Simple: offset along world X axis (ignores object rotation)
+        y_axis = torch.tensor([0.0, 1.0, 0.0], device=grip_pt.device).expand_as(grip_pt)
 
-        # 3. Offset gripper points
-        grip1 = grip_pt + world_disp * direction
-        grip2 = grip_pt - world_disp * direction
-        
+        grip1 = grip_pt + world_disp * y_axis
+        grip2 = grip_pt - world_disp * y_axis
+
         return grip1, grip2
     
     def get_gripper_target_points(self):
@@ -1181,14 +1179,35 @@ class DualArmHandoverEnv(DirectMARLEnv):
         dist_grp1_tgt_r2, dist_grp2_tgt_r2 = dist_grp_tgt_r2
         rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
-                            2* torch.exp(-100 * dist_grp1_tgt_r2) ,
+                            2* torch.exp(-50 * dist_grp1_tgt_r2) ,
                             rewards_2[:, Phases.REACH_GRIP_R2.value] )
         
         rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
-                            2* torch.exp(-100 * dist_grp2_tgt_r2) ,
+                            2* torch.exp(-50 * dist_grp2_tgt_r2) ,
                             rewards_2[:, Phases.REACH_GRIP_R2.value] )
-       
+        mask_close_r2 = ((dist_grp1_tgt_r2 <= self.phase_detector.CLOSE_THRESHOLD) & 
+                     (dist_grp2_tgt_r2 <= self.phase_detector.CLOSE_THRESHOLD) 
+                     ) & ( 
+                    self.not_visited_mask[env_ids, Phases.REACH_GRIP_R2.value] & 
+                    (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE_R2.value].bool()))
+
+        
+        self.not_visited_mask[mask_close_r2, Phases.REACH_GRIP_R2.value] = False
+        rewards[mask_close_r2, Phases.GRIP_1_CLOSE_R2.value] += 2000
+        rewards_2[mask_close_r2, Phases.GRIP_1_CLOSE_R2.value] += 2000
+        # phase 2: GRIP_1_CLOSE
+
+        rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.GRIP_1_CLOSE_R2.value],
+                            2* torch.exp(-50 * dist_grp1_tgt_r2) ,
+                            rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] )
+        
+        rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] += torch.where(
+                            self.not_visited_mask[:, Phases.GRIP_1_CLOSE_R2.value],
+                            2* torch.exp(-50 * dist_grp2_tgt_r2) ,
+                            rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] )
+
 
 
         # rewards_2[:, Phases.GRIP_1_OPEN_R2.value] += torch.where(
