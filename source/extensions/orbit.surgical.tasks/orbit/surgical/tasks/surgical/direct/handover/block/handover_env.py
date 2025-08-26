@@ -1157,8 +1157,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         
       
         
-        mask_grip_r2 = ((dist_obj_ee_2 <= self.phase_detector.CLOSE_THRESHOLD) & 
-                (dist_obj_griplnk_r2 <= self.phase_detector.CLOSE_THRESHOLD)) &  (
+        mask_grip_r2 = ((dist_obj_ee_2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & 
+                (dist_obj_griplnk_r2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD)) &  (
                     self.not_visited_mask[env_ids, Phases.REACH_OBJ_R2.value] & 
                     (phases_one_hot[env_ids, Phases.REACH_GRIP_R2.value].bool()))
 
@@ -1186,8 +1186,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
                             self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
                             2* torch.exp(-50 * dist_grp2_tgt_r2) ,
                             rewards_2[:, Phases.REACH_GRIP_R2.value] )
-        mask_close_r2 = ((dist_grp1_tgt_r2 <= self.phase_detector.CLOSE_THRESHOLD) & 
-                     (dist_grp2_tgt_r2 <= self.phase_detector.CLOSE_THRESHOLD) 
+        mask_close_r2 = ((dist_grp1_tgt_r2 <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) & 
+                     (dist_grp2_tgt_r2 <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) 
                      ) & ( 
                     self.not_visited_mask[env_ids, Phases.REACH_GRIP_R2.value] & 
                     (phases_one_hot[env_ids, Phases.GRIP_1_CLOSE_R2.value].bool()))

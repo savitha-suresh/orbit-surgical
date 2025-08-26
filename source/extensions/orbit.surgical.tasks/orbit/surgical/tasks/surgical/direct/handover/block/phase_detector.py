@@ -297,9 +297,9 @@ class PhaseDetector:
                         ((dist_p1_l <= self.CLOSE_THRESHOLD) | (
                              (prev_phases[:, Phases.REACH_OBJ_R2.value])
                         )) &
-                     (ee2_obj_dist > self.CLOSE_THRESHOLD) &
+                     (ee2_obj_dist > self.SUPER_CLOSE_THRESHOLD) &
                         ~self.env.not_visited_mask[:, Phases.LIFT.value] & (obj_above_ground) &
-                        (obj_grip_link_tg_dist_r2 > self.CLOSE_THRESHOLD)
+                        (obj_grip_link_tg_dist_r2 > self.SUPER_CLOSE_THRESHOLD)
                      )
 
         # phase_mask[:, Phases.REACH_GRIP_R2.value] =  (
@@ -312,19 +312,19 @@ class PhaseDetector:
         #              )
 
         phase_mask[:, Phases.REACH_GRIP_R2.value] = (
-            ((ee2_obj_dist <= self.CLOSE_THRESHOLD)
+            ((ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
              | (ee2_obj_dist <= 0.03) & ((prev_phases[:, Phases.REACH_GRIP_R2.value]))
              ) & 
             (~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
             (obj_above_ground) &
-            (grp1_tgt_dist_r2 > self.CLOSE_THRESHOLD) & 
-            (grp2_tgt_dist_r2 > self.CLOSE_THRESHOLD)
+            (grp1_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD)
         )
 
 
         phase_mask[:, Phases.GRIP_1_CLOSE_R2.value] = (
-           ( ((grp1_tgt_dist_r2 <= self.CLOSE_THRESHOLD) & 
-            (grp2_tgt_dist_r2 <= self.CLOSE_THRESHOLD)) | (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])) &
+           ( ((grp1_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD)) | (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])) &
             (~self.env.not_visited_mask[:, Phases.REACH_OBJ_R2.value]) &
             (obj_above_ground) 
         )
