@@ -519,8 +519,13 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         active_r2_envs = r2_mask.nonzero(as_tuple=True)[0]
 
-        
-            # Get current positions
+        # grp1_r2, grp2_r2 = self.get_grp_tgt_distance_r2(self.robot_2)
+        # envs_r2_close = (grp1_r2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD) & (grp2_r2 <= self.phase_detector.SUPER_CLOSE_THRESHOLD)
+        #     # Get current positions
+        # targets = self.robot_2_curr_targets[:, self.actuated_dof_indices].clone()
+        # targets[envs_r2_close, -1] = 0.04
+        # targets[envs_r2_close, -2] = 0.04
+
         self.robot_2.set_joint_position_target(
             self.robot_2_curr_targets[:, self.actuated_dof_indices],
             joint_ids=self.actuated_dof_indices
@@ -616,7 +621,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
         # Local XY offset (rotates with object)
-        local_xy_offset = torch.tensor([[0.01, -0.01, 0.0]], device=base_pos.device)
+        local_xy_offset = torch.tensor([[0.005, -0.015, 0.0]], device=base_pos.device)
         local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
 
         rot_mat = quat_to_matrix(base_rot)
@@ -705,7 +710,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
         # Local XY offset (rotates with object)
-        local_xy_offset = torch.tensor([[0.01, -0.017, 0.0]], device=base_pos.device)
+        local_xy_offset = torch.tensor([[0.005, -0.015, 0.0]], device=base_pos.device)
         local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
 
         rot_mat = quat_to_matrix(base_rot)
@@ -783,7 +788,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         grip1 = grip_pt + world_disp * y_axis
         grip2 = grip_pt - world_disp * y_axis
 
-        return grip1, grip2
+        return grip2, grip1
     
     def get_gripper_target_points(self):
         displacement = 0.5
