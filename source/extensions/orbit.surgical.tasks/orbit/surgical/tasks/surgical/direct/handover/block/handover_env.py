@@ -1184,12 +1184,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
         dist_grp1_tgt_r2, dist_grp2_tgt_r2 = dist_grp_tgt_r2
         rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
-                            2* torch.exp(-50 * dist_grp1_tgt_r2) ,
+                            2* torch.exp(-100 * dist_grp1_tgt_r2) ,
                             rewards_2[:, Phases.REACH_GRIP_R2.value] )
         
         rewards_2[:, Phases.REACH_GRIP_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.REACH_GRIP_R2.value],
-                            2* torch.exp(-50 * dist_grp2_tgt_r2) ,
+                            2* torch.exp(-100 * dist_grp2_tgt_r2) ,
                             rewards_2[:, Phases.REACH_GRIP_R2.value] )
         mask_close_r2 = ((dist_grp1_tgt_r2 <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) & 
                      (dist_grp2_tgt_r2 <= self.phase_detector.EXTREME_CLOSE_THRESHOLD) 
@@ -1205,12 +1205,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.GRIP_1_CLOSE_R2.value],
-                            2* torch.exp(-50 * dist_grp1_tgt_r2) ,
+                            2* torch.exp(-100 * dist_grp1_tgt_r2) ,
                             rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] )
         
         rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] += torch.where(
                             self.not_visited_mask[:, Phases.GRIP_1_CLOSE_R2.value],
-                            2* torch.exp(-50 * dist_grp2_tgt_r2) ,
+                            2* torch.exp(-100 * dist_grp2_tgt_r2) ,
                             rewards_2[:, Phases.GRIP_1_CLOSE_R2.value] )
 
 
