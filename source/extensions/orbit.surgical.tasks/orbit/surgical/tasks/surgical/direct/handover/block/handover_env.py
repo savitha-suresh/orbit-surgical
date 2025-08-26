@@ -621,7 +621,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
         # Local XY offset (rotates with object)
-        local_xy_offset = torch.tensor([[0.005, -0.015, 0.0]], device=base_pos.device)
+        local_xy_offset = torch.tensor([[0.01, -0.017, 0.0]], device=base_pos.device)
         local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
 
         rot_mat = quat_to_matrix(base_rot)
@@ -710,7 +710,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         base_rot = self.object.data.root_quat_w        # (N, 4)
 
         # Local XY offset (rotates with object)
-        local_xy_offset = torch.tensor([[0.005, -0.015, 0.0]], device=base_pos.device)
+        local_xy_offset = torch.tensor([[0.01, -0.017, 0.0]], device=base_pos.device)
         local_xy_offset = local_xy_offset.expand(base_pos.shape[0], -1)
 
         rot_mat = quat_to_matrix(base_rot)
