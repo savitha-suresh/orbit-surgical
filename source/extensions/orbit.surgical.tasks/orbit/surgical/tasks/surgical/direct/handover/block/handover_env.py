@@ -62,7 +62,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
         self.r2_init_pos[:, :] = torch.tensor([-0.15, 0.0, 0.15], device=self.device)
         self.current_phases = torch.zeros((self.num_envs, len(Phases)), dtype=torch.float, device=self.device)
         self.current_phases[:, Phases.REACH_P1.value] = 1.0
-        self.original_obj_positions = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
+
 
         self.phase_regressed_mask = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
         self.num_hand_dofs = self.robot_1.num_joints
@@ -971,14 +971,6 @@ class DualArmHandoverEnv(DirectMARLEnv):
         return (ee_pos[:, 0] >= x_min) & (ee_pos[:, 0] <= x_max)
 
 
-    def get_goal_ee1_dist(self):
-        obj_pos = self._get_obj_pos() 
-        goal_pos = self.get_goal_pos(obj_pos)
-        ee_1 = self._get_ee_position(self.robot_1)
-        dist_goal1 = torch.norm(goal_pos - ee_1, dim=-1)
-        return dist_goal1
-
-
     def _get_rewards(self):
         phases_one_hot, phase_indices, phase_regressed_mask, phase_same_mask = self._get_phase()  # shape (num_envs, num_phases)
         num_envs, num_phases = phases_one_hot.shape
@@ -1031,9 +1023,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
         #print("visited", self.not_visited_mask, mask, self.not_visited_mask[env_ids, Phases.REACH_P1.value])
         self.not_visited_mask[mask, Phases.REACH_P1.value] = False
         rewards[mask, Phases.REACH_OBJ.value] += 2000
-        self.original_obj_positions[mask, :] = self._get_obj_pos()[mask, :]
-        
-        # phase 1: REACH_OBJ
+        #print("rew", rewards)
+        # phase 0: REACH_OBJ
         dist_obj_ee = torch.norm(obj_pos - ee_1, dim=-1)
         dist_obj_griplnk = torch.norm(obj_griplink_pos - gripper_link_pos, dim=-1)
         rewards[:, Phases.REACH_OBJ.value] += torch.where(
@@ -1406,7 +1397,7 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         x_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
         y_noise = sample_uniform(0, 0.05, (len(env_ids), 1), self.device)
-        z_noise = sample_uniform(0, 0.001, (len(env_ids), 1), self.device)
+        z_noise = sample_uniform(0, 0.01, (len(env_ids), 1), self.device)
 
         pos_noise = torch.cat([x_noise, y_noise, z_noise], dim=1)
         rot_noise = self.cfg.reset_rot_noise * sample_uniform(-1, 1, (len(env_ids), 2), self.device)
@@ -1447,14 +1438,12 @@ class DualArmHandoverEnv(DirectMARLEnv):
 
         
         
-
         self.object.write_root_pose_to_sim(torch.cat((new_pos, new_rot), dim=-1), env_ids)
         self.obj_og_pos[:, :2] = self.get_abs_obj_pos()[:, :2]
         
         self.count = 0
         
         self._compute_intermediate_values()
-        # self.original_obj_positions = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
 
 
 
