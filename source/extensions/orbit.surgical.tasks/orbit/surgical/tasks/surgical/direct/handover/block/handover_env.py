@@ -91,27 +91,27 @@ class DualArmHandoverEnv(DirectMARLEnv):
         )
 
 
-        self.goal_markers = VisualizationMarkers(self.cfg.p1_pos_cfg)
-        self.goal_markers_obj = VisualizationMarkers(self.cfg.obj_pos_cfg)
-        self.markers_goal = VisualizationMarkers(self.cfg.goal_pos_cfg)
-        # self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
-        self.grip_tgt_marker = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg)
-        self.grip_lnk_marker = VisualizationMarkers(self.cfg.grip_lnk_pos_cfg)
-        self.tip_1_marker = VisualizationMarkers(self.cfg.tip_1_cfg)
-        self.tip_2_marker = VisualizationMarkers(self.cfg.tip_2_cfg)
-        self.grp_pt_1_marker = VisualizationMarkers(self.cfg.grp_pt_1_cfg)
-        self.grp_pt_2_marker = VisualizationMarkers(self.cfg.grp_pt_2_cfg)
-        self.tip_1_marker_r2 = VisualizationMarkers(self.cfg.tip_1_cfg_r2)
-        self.tip_2_marker_r2 = VisualizationMarkers(self.cfg.tip_2_cfg_r2)
-        self.grp_pt_1_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_1_cfg_r2)
-        self.grp_pt_2_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_2_cfg_r2)
-        self.obj_marker_r2 = VisualizationMarkers(self.cfg.obj_pos_cfg_r2)
+        # self.goal_markers = VisualizationMarkers(self.cfg.p1_pos_cfg)
+        # self.goal_markers_obj = VisualizationMarkers(self.cfg.obj_pos_cfg)
+        # self.markers_goal = VisualizationMarkers(self.cfg.goal_pos_cfg)
+        # # self.ee_tgt_marker = VisualizationMarkers(self.cfg.ee_tgt_pos_cfg)
+        # self.grip_tgt_marker = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg)
+        # self.grip_lnk_marker = VisualizationMarkers(self.cfg.grip_lnk_pos_cfg)
+        # self.tip_1_marker = VisualizationMarkers(self.cfg.tip_1_cfg)
+        # self.tip_2_marker = VisualizationMarkers(self.cfg.tip_2_cfg)
+        # self.grp_pt_1_marker = VisualizationMarkers(self.cfg.grp_pt_1_cfg)
+        # self.grp_pt_2_marker = VisualizationMarkers(self.cfg.grp_pt_2_cfg)
+        # self.tip_1_marker_r2 = VisualizationMarkers(self.cfg.tip_1_cfg_r2)
+        # self.tip_2_marker_r2 = VisualizationMarkers(self.cfg.tip_2_cfg_r2)
+        # self.grp_pt_1_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_1_cfg_r2)
+        # self.grp_pt_2_marker_r2 = VisualizationMarkers(self.cfg.grp_pt_2_cfg_r2)
+        # self.obj_marker_r2 = VisualizationMarkers(self.cfg.obj_pos_cfg_r2)
         
-        self.p1_pos_marker_r2 = VisualizationMarkers(self.cfg.p1_pos_r2)
-        self.p1_pos_marker_r2_0 = VisualizationMarkers(self.cfg.p1_pos_r2_0)
-        self.p1_pos_marker_r2_1 = VisualizationMarkers(self.cfg.p1_pos_r2_1)
-        self.p1_pos_marker_r2_2 = VisualizationMarkers(self.cfg.p1_pos_r2_2)
-        self.grip_tgt_marker_r2 = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg_r2)
+        # self.p1_pos_marker_r2 = VisualizationMarkers(self.cfg.p1_pos_r2)
+        # self.p1_pos_marker_r2_0 = VisualizationMarkers(self.cfg.p1_pos_r2_0)
+        # self.p1_pos_marker_r2_1 = VisualizationMarkers(self.cfg.p1_pos_r2_1)
+        # self.p1_pos_marker_r2_2 = VisualizationMarkers(self.cfg.p1_pos_r2_2)
+        # self.grip_tgt_marker_r2 = VisualizationMarkers(self.cfg.grip_tgt_pos_cfg_r2)
 
         joint_pos_limits = self.robot_1.root_physx_view.get_dof_limits().to(self.device)
         self.hand_dof_lower_limits = joint_pos_limits[..., 0]
@@ -137,40 +137,40 @@ class DualArmHandoverEnv(DirectMARLEnv):
     def _pre_physics_step(self, actions):
     
         self.actions = actions
-        obj_pos = self._get_obj_pos()
-        self.goal_markers_obj.visualize(obj_pos)
-        p1_pos = self.get_p1_pos(obj_pos)
-        self.goal_markers.visualize(p1_pos)
-        goal_pos = self.get_goal_pos(obj_pos)
-        self.markers_goal.visualize(goal_pos)
+        # obj_pos = self._get_obj_pos()
+        # self.goal_markers_obj.visualize(obj_pos)
+        # p1_pos = self.get_p1_pos(obj_pos)
+        # self.goal_markers.visualize(p1_pos)
+        # goal_pos = self.get_goal_pos(obj_pos)
+        # self.markers_goal.visualize(goal_pos)
 
 
-        # self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
-        self.grip_tgt_marker.visualize(self.get_obj_griplnk_tgt_pos())
-        self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
-        grip_pos = self.get_gripper_tip_positions(self.robot_1)
+        # # self.ee_tgt_marker.visualize(self.get_obj_grip_pos())
+        # self.grip_tgt_marker.visualize(self.get_obj_griplnk_tgt_pos())
+        # self.grip_lnk_marker.visualize(self.get_gripper_link_pos(self.robot_1))
+        # grip_pos = self.get_gripper_tip_positions(self.robot_1)
         
-        self.tip_1_marker.visualize(grip_pos[0])
-        self.tip_2_marker.visualize(grip_pos[1])
-        grip_end_pts = self.get_gripper_target_points()
-        self.grp_pt_1_marker.visualize(grip_end_pts[0])
-        self.grp_pt_2_marker.visualize(grip_end_pts[1])
+        # self.tip_1_marker.visualize(grip_pos[0])
+        # self.tip_2_marker.visualize(grip_pos[1])
+        # grip_end_pts = self.get_gripper_target_points()
+        # self.grp_pt_1_marker.visualize(grip_end_pts[0])
+        # self.grp_pt_2_marker.visualize(grip_end_pts[1])
 
 
-        self.p1_pos_marker_r2.visualize(self.get_p1_pos_r2())
-        p1_pts = self.get_p1_pos_r2_3()
-        self.p1_pos_marker_r2_0.visualize(p1_pts[0])
-        self.p1_pos_marker_r2_1.visualize(p1_pts[1])
-        self.p1_pos_marker_r2_2.visualize(p1_pts[2])
-        grip_pos_r2 = self.get_gripper_tip_positions(self.robot_2)
+        # self.p1_pos_marker_r2.visualize(self.get_p1_pos_r2())
+        # p1_pts = self.get_p1_pos_r2_3()
+        # self.p1_pos_marker_r2_0.visualize(p1_pts[0])
+        # self.p1_pos_marker_r2_1.visualize(p1_pts[1])
+        # self.p1_pos_marker_r2_2.visualize(p1_pts[2])
+        # grip_pos_r2 = self.get_gripper_tip_positions(self.robot_2)
         
-        self.tip_1_marker_r2.visualize(grip_pos_r2[0])
-        self.tip_2_marker_r2.visualize(grip_pos_r2[1])
-        grip_end_pts_r2 = self.get_gripper_target_points_r2()
-        self.grp_pt_1_marker_r2.visualize(grip_end_pts_r2[0])
-        self.grp_pt_2_marker_r2.visualize(grip_end_pts_r2[1])
-        self.obj_marker_r2.visualize(self._get_obj_pos_r2())
-        self.grip_tgt_marker_r2.visualize(self.get_obj_griplnk_tgt_pos_r2())
+        # self.tip_1_marker_r2.visualize(grip_pos_r2[0])
+        # self.tip_2_marker_r2.visualize(grip_pos_r2[1])
+        # grip_end_pts_r2 = self.get_gripper_target_points_r2()
+        # self.grp_pt_1_marker_r2.visualize(grip_end_pts_r2[0])
+        # self.grp_pt_2_marker_r2.visualize(grip_end_pts_r2[1])
+        # self.obj_marker_r2.visualize(self._get_obj_pos_r2())
+        # self.grip_tgt_marker_r2.visualize(self.get_obj_griplnk_tgt_pos_r2())
 
         
 
@@ -526,10 +526,34 @@ class DualArmHandoverEnv(DirectMARLEnv):
         # targets[envs_r2_close, -1] = 0.04
         # targets[envs_r2_close, -2] = 0.04
 
-        self.robot_2.set_joint_position_target(
-            self.robot_2_curr_targets[:, self.actuated_dof_indices],
-            joint_ids=self.actuated_dof_indices
-        )
+
+        grip_close_mask_r2 = self.current_phases[:, Phases.GRIP_1_CLOSE_R2.value].bool() | ~self.not_visited_mask[:, Phases.REACH_GRIP_R2.value]
+        grip_envs_r2 = torch.nonzero(grip_close_mask_r2).squeeze(-1)
+        
+        non_grip_envs_r2 = torch.nonzero(~grip_close_mask_r2).squeeze(-1)
+       
+       
+        if grip_envs_r2.numel() > 0:
+            target = self.robot_2_curr_targets.clone()
+            target[grip_envs_r2[:, None], -1] = 0.04
+            target[grip_envs_r2[:, None], -2] = -0.04
+            self.robot_2.set_joint_position_target(
+                target[grip_envs_r2[:, None], [6,7]],
+                env_ids=grip_envs_r2,
+                joint_ids=[6,7]
+            )
+
+        if non_grip_envs_r2.numel() > 0:
+            self.robot_2.set_joint_position_target(
+                self.robot_2_curr_targets[non_grip_envs_r2[:, None], self.actuated_dof_indices],
+                env_ids=non_grip_envs_r2,
+                joint_ids=self.actuated_dof_indices
+            )
+
+        # self.robot_2.set_joint_position_target(
+        #     self.robot_2_curr_targets[:, self.actuated_dof_indices],
+        #     joint_ids=self.actuated_dof_indices
+        # )
 
         # if global_grip_envs_r2.numel() > 0:
         #     closed_position = 0.0  # or whatever your closed position should be
