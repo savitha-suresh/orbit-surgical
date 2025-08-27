@@ -238,14 +238,10 @@ class EvaluationMetrics:
             'max': float(torch.max(all_rewards))
         }
 
-        all_initial_positions = torch.cat([data['initial_obj_positions'] for data in self.all_episodes_data])
+        
         all_final_positions = torch.cat([data['final_obj_positions'] for data in self.all_episodes_data])
-        initial_position_std = self.get_position_std(all_initial_positions)
         final_position_std = self.get_position_std(all_final_positions)
-        position_min = torch.min(all_initial_positions, dim=0).values
-        position_max = torch.max(all_initial_positions, dim=0).values
-        position_range = position_max - position_min
-
+        
         summary = {
             'num_episodes': num_episodes,
             'num_envs_per_episode': self.num_envs,
@@ -254,12 +250,8 @@ class EvaluationMetrics:
             'height_success_rate': height_success_rate,
             'episode_length_stats': episode_length_stats,
             'reward_stats': reward_stats,
-            'initial_position_std': initial_position_std,
             'final_position_std': final_position_std,
-            'obj_drop_count_rate': drop_count_rate,
-            'pos_min': position_min,
-            'pos_max': position_max,
-            'position_ranges': position_range
+            'obj_drop_count_rate': drop_count_rate
         }
         return summary
     
@@ -425,8 +417,7 @@ def main():
                 current_not_visited_mask = None
                 
 
-                initial_obj_positions = env.unwrapped.original_obj_positions.cpu()
-                metrics.store_initial_positions(initial_obj_positions , newly_done)
+               
                     
                 current_not_visited_mask = env.unwrapped.not_visited_mask.cpu()
                 metrics.update_phase_data(current_not_visited_mask, timestep)
