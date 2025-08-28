@@ -1,0 +1,459 @@
+import torch
+import numpy as np
+from typing import Dict, Any
+from enum import Enum
+import torch.nn.functional as F
+
+
+def log_if(condition, *args, **kwargs):
+    return
+    if condition:
+        print(*args, **kwargs)
+
+
+class Phases(Enum):
+
+
+    REACH_P1 = 0
+    # Until reaching the object
+    REACH_OBJ = 1
+    # R1 grips 1
+    # until r1 opens the gripper
+    GRIP_1_OPEN = 2
+    REACH_OBJ_GRIP = 3
+    GRIP_1_CLOSE = 4
+    # until r1 lifts the obj
+    LIFT = 5
+    # R1 reaches goal 1
+    REACH_GOAL_1 = 6
+    REACH_OBJ_R2 = 7
+    REACH_GRIP_R2 = 8
+    GRIP_1_CLOSE_R2 = 9
+    # REACH_OBJ_R2 = 7
+    # R1 grips 1
+    # until r1 opens the gripper
+    # GRIP_1_OPEN_R2 = 8
+    # REACH_OBJ_GRIP_R2 = 9
+    # GRIP_1_CLOSE_R2 = 10
+   
+    # R2 reaches near ee of R1
+    # REACH_GOAL_2 = 11
+    # #R2 grips object
+    # GRIP_2 = 12
+    # #R1 releases object
+    # RELEASE_1 = 13
+    # # Task completed
+    # END = 14
+
+
+class PhaseDetector:
+    def __init__(self, cfg, env):
+        self.cfg = cfg
+        self.env = env
+        # Distance thresholds for phase detection
+        self.CLOSE_THRESHOLD = 0.01  # 5cm
+        self.SUPER_CLOSE_THRESHOLD = 0.005  # 2cm
+        self.EXTREME_CLOSE_THRESHOLD = 0.001
+        self.FAR_THRESHOLD = 0.15  # 15cm
+        self.GRIP_THRESHOLD = 0.01
+        self.GRIP_CLOSE_THRESHOLD = 0.005
+        self.GRIP_WIDTH = 0.8
+        
+    def _get_ee_position(self, robot):
+        ee_pos = robot.data.body_pos_w[:, robot.find_bodies(self.cfg.ee_link_name)[0]]
+        return ee_pos.squeeze(1)
+    
+
+    def get_gripper_pos(self, robot):
+        gripper_joints = self.cfg.finger_joint_names
+        joint_pos = robot.data.joint_pos
+        
+        # Get joint indices
+        gripper_indices = []
+        for joint_name in gripper_joints:
+            joint_idx = robot.find_joints(joint_name)[0]
+            gripper_indices.append(joint_idx)
+        
+        # Check if gripper is closed (small joint values)
+        gripper_pos = joint_pos[:, gripper_indices]
+        
+        gripper_pos = gripper_pos.squeeze(2)
+        return gripper_pos
+    
+
+    def get_gripper_width(self, robot):
+        gripper_pos = self.get_gripper_pos(robot)
+        gripper_distance = torch.abs(gripper_pos[:, 0]) + torch.abs(gripper_pos[:, 1])
+        return gripper_distance
+
+    
+    
+    def is_gripper_closed(self, robot):
+        """Get gripper state (open/closed) based on joint positions"""
+        
+        
+        # Get gripper joint positions
+        gripper_pos = self.get_gripper_pos(robot)
+        # Gripper is closed if both joints are close to closed position
+        closed_threshold = 0.01  # Adjust based on your gripper
+        is_closed = torch.all(torch.abs(gripper_pos) < closed_threshold, dim=-1)
+        
+        return is_closed
+    
+    def is_holding_object(self, robot):
+        return self._is_holding_object(robot)
+    
+
+    
+    def _is_holding_object(self, robot):
+        """Check if robot is holding the object"""
+        obj_position = self.env.get_abs_obj_pos()
+        ee_position = self._get_ee_position(robot)
+        gripper_closed = self.is_gripper_closed(robot)
+        
+        # Object is being held if gripper is closed and EE is very close to object
+        ee_obj_distance = torch.norm(ee_position - obj_position, dim=-1)
+        is_holding = gripper_closed & (ee_obj_distance < self.SUPER_CLOSE_THRESHOLD)
+        
+        return is_holding
+    
+    
+    def is_object_above_ground(self):
+        """Check if object is above ground"""
+        ground_height = self.cfg.ground_height
+        obj_position = self.env.get_abs_obj_pos()
+        return obj_position[:, 2] > 0.009  # 1cm above ground
+    
+    def _get_distance(self, pos1, pos2):
+        """Calculate Euclidean distance between two positions"""
+        return torch.norm(pos1 - pos2, dim=-1)
+    
+    
+    def get_phases(self, agents, batch_size, obj_position, goal_position, prev_phases):
+        robot_1, robot_2 = agents
+        obj_grip_pos = self.env.get_obj_grip_pos()
+        obj_grip_pos_r2 = self.env.get_obj_grip_pos_r2()
+
+        obj_pos_r2 = self.env.get_obj_pos_r2()
+        ee_1_pos = self._get_ee_position(robot_1)         # (num_envs, 3)
+        ee_2_pos = self._get_ee_position(robot_2)         # (num_envs, 3)
+
+        grip_lnk_pos = self.env.get_gripper_link_pos(robot_1)
+        grip_lnk_pos_r2 = self.env.get_gripper_link_pos(robot_2)
+
+        obj_grip_tgt_pos = self.env.get_obj_griplnk_tgt_pos()
+        grip_lnk_tgt_pos = self.env.get_gripper_link_target_pos()
+        
+        obj_grip_tgt_pos_r2 = self.env.get_obj_griplnk_tgt_pos_r2()
+        grip_lnk_tgt_pos_r2 = self.env.get_gripper_link_target_pos_r2()
+
+        prev_phases = prev_phases.bool()
+        #print("prev_phases", prev_phases)
+        gripper_1_closed = self.is_gripper_closed(robot_1)  # (num_envs,)
+        gripper_2_closed = self.is_gripper_closed(robot_2)  # (num_envs,)
+        robot_1_holding = self._is_holding_object(robot_1)  # (num_envs,)
+        robot_2_holding = self._is_holding_object(robot_2)  # (num_envs,)
+        gripper_width = self.get_gripper_width(robot_1)
+        gripper_width_r2 = self.get_gripper_width(robot_2)
+        obj_above_ground = self.is_object_above_ground()      # (num_envs,)
+        p1_pos = self.env.get_p1_pos(obj_position)
+        p1_pos_r2 = self.env.get_p1_pos_r2()
+        ee1_p1_dist = self._get_distance(ee_1_pos, p1_pos)
+        ee2_p1_dist = self._get_distance(ee_2_pos, p1_pos_r2)
+        ee1_obj_dist = self._get_distance(ee_1_pos, obj_position)
+        ee2_obj_dist = self._get_distance(ee_2_pos, obj_pos_r2)
+
+        ee1_goal_dist = self._get_distance(ee_1_pos, goal_position)
+        ee2_goal_dist = self._get_distance(ee_2_pos, goal_position)
+        ee1_obj_grip_dist = self._get_distance(ee_1_pos, obj_grip_pos)
+        ee2_obj_grip_dist = self._get_distance(ee_2_pos, obj_grip_pos_r2)
+        grip_link_tgt_dist = self._get_distance(grip_lnk_pos, grip_lnk_tgt_pos)
+        obj_grip_link_tg_dist = self._get_distance(obj_grip_tgt_pos, grip_lnk_pos)
+        grp_tgt_dist = self.env.get_grp_tgt_distance(robot_1)
+        grp1_tgt_dist = grp_tgt_dist[0]
+        grp2_tgt_dist = grp_tgt_dist[1]
+
+
+        # yellow point, the blue point above, white point, the gripper points on the side
+
+        ee2_obj_grip_dist = self._get_distance(ee_2_pos, obj_grip_pos_r2)
+        grip_link_tgt_dist_r2 = self._get_distance(grip_lnk_pos_r2, grip_lnk_tgt_pos_r2)
+        obj_grip_link_tg_dist_r2 = self._get_distance(obj_grip_tgt_pos_r2, grip_lnk_pos_r2)
+        grp_tgt_dist_r2 = self.env.get_grp_tgt_distance_r2(robot_2)
+        grp1_tgt_dist_r2 = grp_tgt_dist_r2[0]
+        grp2_tgt_dist_r2 = grp_tgt_dist_r2[1]
+
+
+
+        #log_if(not self.cfg.is_training, f"gripper_link_to tgt {grip_link_tgt_dist}")
+        num_envs = batch_size
+        num_phases = len(Phases)
+        device = ee_1_pos.device
+        # initialize all phases to False
+        phase_mask = torch.zeros((num_envs, num_phases), dtype=torch.bool, device=device)
+        # PHASE 0: REACH_OBJ
+        
+        log_if(not self.cfg.is_training, f"ee_p1 {ee1_p1_dist} obj to ee {ee1_obj_dist} grip_toee {ee1_obj_grip_dist} goal to ee_dist {ee1_goal_dist} ")
+        log_if(not self.cfg.is_training, f"grip distances {grp_tgt_dist} obj_grip_link_tg_dist {obj_grip_link_tg_dist}")
+        
+
+        log_if(not self.cfg.is_training, f" r2 ee2_p1 {ee2_p1_dist} obj to ee {ee2_obj_dist} grip_toee {ee2_obj_grip_dist} goal to ee_dist {ee2_goal_dist} ")
+        log_if(not self.cfg.is_training, f"r2 grip distances {grp_tgt_dist_r2} obj_grip_link_tg_dist {obj_grip_link_tg_dist_r2}")
+        
+        
+        phase_mask[:, Phases.REACH_P1.value] = (
+            (ee1_p1_dist > self.CLOSE_THRESHOLD) 
+        )
+        # print((prev_phases))
+        #print("ARE", self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos))
+        phase_mask[:, Phases.REACH_OBJ.value] =  (
+            (
+                (ee1_p1_dist <= self.CLOSE_THRESHOLD) |
+                (
+                    self.env.is_point_between_parallel_lines(obj_position, p1_pos, ee_1_pos) &
+                    (ee1_obj_dist > self.SUPER_CLOSE_THRESHOLD) &
+                    ~self.env.not_visited_mask[:, Phases.REACH_P1.value] & 
+                    (obj_grip_link_tg_dist > self.SUPER_CLOSE_THRESHOLD)
+                )
+            )
+            & (~obj_above_ground)
+        )
+
+       # PHASE 1: GRIP_1_OPEN
+        phase_mask[:, Phases.GRIP_1_OPEN.value] = (
+            (ee1_obj_dist <= self.SUPER_CLOSE_THRESHOLD) &
+            (obj_grip_link_tg_dist <= self.SUPER_CLOSE_THRESHOLD) & 
+            (gripper_width < self.GRIP_WIDTH) &
+            (~obj_above_ground) &
+            ~self.env.not_visited_mask[:, Phases.REACH_P1.value]
+        )
+
+        phase_mask[:, Phases.REACH_OBJ_GRIP.value] = (
+            ((ee1_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
+             | (ee1_obj_dist <= 0.025) & ((prev_phases[:, Phases.REACH_OBJ_GRIP.value]))
+             ) & 
+            ((gripper_width >= self.GRIP_WIDTH)) &
+            (~obj_above_ground) &
+            ~self.env.not_visited_mask[:, Phases.REACH_OBJ.value] & 
+            (grp1_tgt_dist > self.EXTREME_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist > self.EXTREME_CLOSE_THRESHOLD) 
+            # & 
+            # (grip_link_tgt_dist > self.GRIP_CLOSE_THRESHOLD)  
+           
+
+        )
+
+        # PHASE 2: GRIP_1_CLOSE
+        phase_mask[:, Phases.GRIP_1_CLOSE.value] = (
+            
+                (  (
+                    (grp1_tgt_dist <= self.EXTREME_CLOSE_THRESHOLD) & 
+                    (grp2_tgt_dist <= self.EXTREME_CLOSE_THRESHOLD)) |
+                    (
+                    (((grp1_tgt_dist < 0.005) & (prev_phases[:, Phases.GRIP_1_CLOSE.value])) & 
+                    ((grp2_tgt_dist < 0.007) & ((prev_phases[:, Phases.GRIP_1_CLOSE.value]))))
+
+                    )
+                )&
+                #(grip_link_tgt_dist <= self.GRIP_CLOSE_THRESHOLD) &
+            (~obj_above_ground) &
+            (
+                (
+                    (gripper_width >= self.GRIP_WIDTH) &
+                    (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN.value])
+                ) |
+                (
+                    (gripper_width >= 0.15) &
+                    (prev_phases[:, Phases.GRIP_1_CLOSE.value])
+                )
+            ) &
+            (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN.value])
+        )
+
+
+        # # # PHASE 3: LIFT
+        phase_mask[:, Phases.LIFT.value] = (
+
+            (
+                    (grp1_tgt_dist < 0.005) & 
+                    (grp2_tgt_dist < 0.007)) & 
+            (~obj_above_ground) &
+            (gripper_width < 0.15) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP.value]
+        )
+
+        # # # PHASE 4: REACH_GOAL_1
+        phase_mask[:, Phases.REACH_GOAL_1.value] = (
+            
+            obj_above_ground &
+            (ee1_goal_dist > self.CLOSE_THRESHOLD) &  ~self.env.not_visited_mask[:, Phases.GRIP_1_CLOSE.value]
+        )
+
+
+        p1_pts = self.env.get_p1_pos_r2_3()
+        p1_l = p1_pts[-1]
+        dist_p1_l = self._get_distance(ee_2_pos, p1_l)
+
+        phase_mask[:, Phases.REACH_OBJ_R2.value] =  (
+                        ((ee1_goal_dist <= self.CLOSE_THRESHOLD) | ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
+                        ((dist_p1_l <= self.CLOSE_THRESHOLD) | (
+                             (prev_phases[:, Phases.REACH_OBJ_R2.value])
+                        )) &
+                     (ee2_obj_dist > self.SUPER_CLOSE_THRESHOLD) &
+                        ~self.env.not_visited_mask[:, Phases.LIFT.value] & (obj_above_ground) &
+                        (obj_grip_link_tg_dist_r2 > self.SUPER_CLOSE_THRESHOLD)
+                     )
+
+        # phase_mask[:, Phases.REACH_GRIP_R2.value] =  (
+        #                 ( ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
+        #              (ee2_obj_dist <= self.CLOSE_THRESHOLD) &
+        #                 ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value] & (obj_above_ground) &
+        #                 (obj_grip_link_tg_dist_r2 <= self.CLOSE_THRESHOLD) & 
+        #                 (ee2_obj_grip_dist > self.CLOSE_THRESHOLD)
+
+        #              )
+
+        phase_mask[:, Phases.REACH_GRIP_R2.value] = (
+            ((ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
+             | (ee2_obj_dist <= 0.03) & ((prev_phases[:, Phases.REACH_GRIP_R2.value]))
+             ) & 
+            (~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]) &
+            (obj_above_ground) &
+            (grp1_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD)
+        )
+
+
+        phase_mask[:, Phases.GRIP_1_CLOSE_R2.value] = (
+           ( ((grp1_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD) & 
+            (grp2_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD)) | (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])) &
+            (~self.env.not_visited_mask[:, Phases.REACH_OBJ_R2.value]) &
+            (obj_above_ground) 
+        )
+
+            # PHASE 1: GRIP_1_OPEN
+        # phase_mask[:, Phases.GRIP_1_OPEN_R2.value] = (
+        #     (ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD) &
+        #     (obj_grip_link_tg_dist_r2 <= self.SUPER_CLOSE_THRESHOLD) & 
+        #     (gripper_width_r2 < self.GRIP_WIDTH) &
+        #     (~obj_above_ground) &
+        #     ~self.env.not_visited_mask[:, Phases.REACH_GOAL_1.value]
+        # )
+
+        # phase_mask[:, Phases.REACH_OBJ_GRIP_R2.value] = (
+        #     ((ee2_obj_dist <= self.SUPER_CLOSE_THRESHOLD)
+        #     | (ee2_obj_dist <= 0.025) & ((prev_phases[:, Phases.REACH_OBJ_GRIP_R2.value]))
+        #     ) & 
+        #     ((gripper_width_r2 >= self.GRIP_WIDTH)) &
+        #     (~obj_above_ground) &
+        #     ~self.env.not_visited_mask[:, Phases.REACH_OBJ_R2.value] & 
+        #     (grp1_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) & 
+        #     (grp2_tgt_dist_r2 > self.EXTREME_CLOSE_THRESHOLD) 
+        # )
+
+        # # PHASE 2: GRIP_1_CLOSE
+        # phase_mask[:, Phases.GRIP_1_CLOSE_R2.value] = (
+            
+        #         (  (
+        #             (grp1_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD) & 
+        #             (grp2_tgt_dist_r2 <= self.EXTREME_CLOSE_THRESHOLD)) |
+        #             (
+        #             (((grp1_tgt_dist_r2 < 0.005) & (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])) & 
+        #             ((grp2_tgt_dist_r2 < 0.007) & ((prev_phases[:, Phases.GRIP_1_CLOSE_R2.value]))))
+
+        #             )
+        #         )&
+                
+        #     (~obj_above_ground) &
+        #     (
+        #         (
+        #             (gripper_width_r2 >= self.GRIP_WIDTH) &
+        #             (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value])
+        #         ) |
+        #         (
+        #             (gripper_width_r2 >= 0.15) &
+        #             (prev_phases[:, Phases.GRIP_1_CLOSE_R2.value])
+        #         )
+        #     ) &
+        #     (~self.env.not_visited_mask[:, Phases.GRIP_1_OPEN_R2.value])
+        # )
+
+
+        # # # PHASE 3: LIFT
+        # phase_mask[:, Phases.LIFT_R2.value] = (
+
+        #     (
+        #             (grp1_tgt_dist_r2 < 0.005) & 
+        #             (grp2_tgt_dist_r2 < 0.007)) & 
+        #     (~obj_above_ground) &
+        #     (gripper_width_r2 < 0.15) & ~self.env.not_visited_mask[:, Phases.REACH_OBJ_GRIP_R2.value]
+        # )
+
+        # # # # PHASE 4: REACH_GOAL_1
+        # phase_mask[:, Phases.REACH_GOAL_2.value] = (
+            
+        #     obj_above_ground &
+        #     (ee2_goal_dist > self.CLOSE_THRESHOLD) &  ~self.env.not_visited_mask[:, Phases.GRIP_1_CLOSE.value]
+        #)
+        # # PHASE 5: REACH_GOAL_2
+        # phase_mask[:, Phases.REACH_GOAL_2.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     gripper_1_closed &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist > self.FAR_THRESHOLD)
+        # )
+
+        # # PHASE 6: GRIP_2
+        # phase_mask[:, Phases.GRIP_2.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     gripper_1_closed &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     gripper_2_closed &
+        #     (~robot_2_holding)
+        # )
+
+        # # PHASE 7: RELEASE_1
+        # phase_mask[:, Phases.RELEASE_1.value] = (
+        #     robot_1_holding &
+        #     obj_above_ground &
+        #     gripper_1_closed &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     gripper_2_closed &
+        #     robot_2_holding
+        # )
+
+        # # PHASE 8: END
+        # phase_mask[:, Phases.END.value] = (
+        #     (~robot_1_holding) &
+        #     obj_above_ground &
+        #     (ee1_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     (ee2_goal_dist <= self.CLOSE_THRESHOLD) &
+        #     gripper_2_closed &
+        #     robot_2_holding
+        # )
+        
+        # priority logic: use highest index where True
+        # reversed_mask = phase_mask.flip(dims=[1])
+        # reversed_indices = torch.argmax(reversed_mask.int(), dim=1)
+        # last_indices = phase_mask.size(1) - 1 - reversed_indices
+        valid_mask = phase_mask.any(dim=1)  # (num_envs,) - which envs have any True phase
+        phase_indices = torch.zeros(num_envs, dtype=torch.long, device=device)
+        #print(phase_mask)
+    # For environments with True phases, find the maximum index where True
+        if valid_mask.any():
+            # Get the last True index for each row
+            flipped_mask = phase_mask.flip(dims=[1])  # Flip to make last index first
+            first_true_in_flipped = torch.argmax(flipped_mask.int(), dim=1)  # Get first True in flipped
+            last_true_in_original = num_phases - 1 - first_true_in_flipped  # Convert back to original indexing
+            phase_indices = torch.where(valid_mask, last_true_in_original, phase_indices)
+
+        
+        prev_phase_indices = torch.argmax(prev_phases.int(), dim=1)
+        phase_regressed_mask = (phase_indices < prev_phase_indices)
+        phase_same_mask = (phase_indices == prev_phase_indices)
+        one_hot = F.one_hot(phase_indices, num_classes=num_phases).float()  # (num_envs, num_phases)
+        log_if(not self.cfg.is_training, phase_indices, one_hot)
+        return one_hot, phase_indices, phase_regressed_mask, phase_same_mask

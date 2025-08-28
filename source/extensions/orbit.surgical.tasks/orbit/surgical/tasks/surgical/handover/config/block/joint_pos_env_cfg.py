@@ -27,7 +27,6 @@ class BlockHandoverEnvCfg(HandoverEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
-
         # Set PSM as robot
         self.scene.robot_1 = PSM_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot_1")
         self.scene.robot_1.init_state.pos = (0.2, 0.0, 0.15)
