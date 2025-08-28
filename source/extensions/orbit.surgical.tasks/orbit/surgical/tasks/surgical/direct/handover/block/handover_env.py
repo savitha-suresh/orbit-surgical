@@ -535,8 +535,8 @@ class DualArmHandoverEnv(DirectMARLEnv):
        
         if grip_envs_r2.numel() > 0:
             target = self.robot_2_curr_targets.clone()
-            target[grip_envs_r2[:, None], -1] = 0.04
-            target[grip_envs_r2[:, None], -2] = -0.04
+            target[grip_envs_r2[:, None], -1] = 0.07
+            target[grip_envs_r2[:, None], -2] = -0.07
             self.robot_2.set_joint_position_target(
                 target[grip_envs_r2[:, None], [6,7]],
                 env_ids=grip_envs_r2,
@@ -550,6 +550,26 @@ class DualArmHandoverEnv(DirectMARLEnv):
                 joint_ids=self.actuated_dof_indices
             )
 
+
+        r2_gripper_pos = self.robot_2.data.joint_pos_target.clone()  # shape: [num_envs, num_joints]
+
+        # Identify envs where robot 2 gripper is fully closed
+        r2_gripper_closed_envs = (torch.nonzero(r2_gripper_pos[:, -1] == 0.07).squeeze(-1)) & (torch.nonzero(r2_gripper_pos[:, -2] == -0.07).squeeze(-1))
+
+        # Open robot 1 gripper in those environments
+        if r2_gripper_closed_envs.numel() > 0:
+            # Get current positions of robot 1
+            r1_positions = self.robot_1.data.joint_pos_target.clone()[r2_gripper_closed_envs,:]
+            
+            # Open gripper: set last two joints to 0.0 (or your open value)
+            r1_positions[:, -1] = 0.5
+            r1_positions[:, -2] = -0.5
+            
+            self.robot_1.set_joint_position_target(
+                r1_positions[:, [6,7]],
+                env_ids=r2_gripper_closed_envs,
+                joint_ids=[6,7]
+            )
         # self.robot_2.set_joint_position_target(
         #     self.robot_2_curr_targets[:, self.actuated_dof_indices],
         #     joint_ids=self.actuated_dof_indices
