@@ -1,11 +1,11 @@
-![ORBIT-Surgical](media/teaser.png)
+![ORBIT-Surgical]
 
 ---
 ## Successfull needle handover
 
-![needle_handover](https://github.com/user-attachments/assets/42eae097-3dc6-4126-a49d-2b951b12c6dd)
+![needle_handover](media/needle_handover.gif)
 
-Devised a novel system to perform a completely autonomous needle-handover.
+Devised a novel system to perform a completely autonomous needle-handover with 80% accuracy.
 
 # ORBIT-Surgical
 
