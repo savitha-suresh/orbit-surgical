@@ -1,11 +1,12 @@
-![ORBIT-Surgical]
 
+# Multi-Agent RL for Autonomous Surgical Tasks
 ---
 ## Successfull needle handover
 
 ![needle_handover](media/needle_handover.gif)
 
-Devised a novel system to perform a completely autonomous needle-handover with 80% accuracy.
+Devised a novel system to perform a completely autonomous needle-handover with **80% accuracy.**
+
 
 # ORBIT-Surgical
 
